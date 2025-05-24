@@ -8,6 +8,7 @@ from app.db.session import get_db_session
 from app.db.models import User, Project, Prompt, PromptVersion, Run
 import loguru
 import traceback
+from app.utils.auth import hash_password
 
 logger = loguru.logger
 
@@ -31,6 +32,26 @@ def get_users() -> List[dict]:
     except Exception as e:
         logger.error(f"Error getting users: {traceback.format_exc()}")
         return []
+
+
+def create_user(user_data):
+    try:
+        name = user_data.get("name")
+        email = user_data.get("email")
+        password = user_data.get("password")
+        with get_db_session() as db:
+            existing_user = db.query(User).filter(User.email == email).first()
+            if existing_user:
+                return False
+            hashed_pw = hash_password(password)
+            user = User(name=name, email=email, hashed_password=hashed_pw)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return True
+    except Exception as e:
+        logger.error(f"Error creating user: {traceback.format_exc()}")
+        return False
 
 
 def set_user(user_data: dict) -> bool:
@@ -213,6 +234,19 @@ def get_prompts_by_user_email(email: str) -> List[dict]:
     except Exception as e:
         logger.error(f"Error getting prompts by user email: {traceback.format_exc()}")
         return []
+    
+def create_prompt(prompt_data: dict, project_id: int) -> bool:
+    try:
+        with get_db_session() as db:
+            prompt_data['project_id'] = project_id
+            prompt = Prompt(**prompt_data)
+            db.add(prompt)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error creating prompt: {traceback.format_exc()}")
+        return False
+
 
 def set_prompt(prompt_data: dict) -> bool:
     try:

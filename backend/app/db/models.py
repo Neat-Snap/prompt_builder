@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, Float, Table, BigInteger
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, Float, Table, BigInteger, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -21,6 +21,7 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
     role = Column(String, default="user")
     color_theme = Column(String, default="light")
+    keys = Column(JSON, nullable=True)
 
     projects = relationship("Project", back_populates="user")
 
@@ -34,6 +35,7 @@ class Project(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
+    keys = Column(JSON, nullable=True)
 
     user_id = Column(BigInteger, ForeignKey("users.id"))
     user = relationship("User", back_populates="projects")
@@ -50,6 +52,7 @@ class Prompt(Base):
     project_id = Column(BigInteger, ForeignKey("projects.id"))
     project = relationship("Project", back_populates="prompts")
     versions = relationship("PromptVersion", back_populates="prompt")
+    runs = relationship("Run", back_populates="prompt")
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -78,9 +81,10 @@ class Run(Base):
     cost = Column(Float, nullable=True)
     success = Column(Boolean, nullable=True)
     result = Column(Text, nullable=True)
+    prompt_id = Column(BigInteger, ForeignKey("prompts.id"))
 
-    prompt = relationship("Prompt", back_populates="runs")
     user = relationship("User")
+    prompt = relationship("Prompt", back_populates="runs")
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

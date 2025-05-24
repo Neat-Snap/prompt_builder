@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,9 +19,11 @@ import {
   FileText,
   Wand2
 } from 'lucide-react';
+import { promptsApi } from '@/lib/api';
 
 interface PromptsConstructorProps {
   projectId: string;
+  promptId?: string | null;
 }
 
 interface PromptBuilder {
@@ -36,7 +38,7 @@ interface PromptBuilder {
   customFields: { key: string; value: string }[];
 }
 
-export function PromptsConstructor({ projectId }: PromptsConstructorProps) {
+export function PromptsConstructor({ projectId, promptId }: PromptsConstructorProps) {
   const [promptBuilder, setPromptBuilder] = useState<PromptBuilder>({
     name: '',
     role: '',
@@ -50,6 +52,9 @@ export function PromptsConstructor({ projectId }: PromptsConstructorProps) {
   });
 
   const [generatedPrompt, setGeneratedPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const rolePresets = [
     'Professional Assistant',
@@ -72,6 +77,30 @@ export function PromptsConstructor({ projectId }: PromptsConstructorProps) {
     'Numbered List',
     'Custom Format'
   ];
+
+  useEffect(() => {
+    if (promptId) {
+      setLoading(true);
+      promptsApi.get(projectId, promptId)
+        .then(res => {
+          // Map API data to promptBuilder state
+          setPromptBuilder({
+            name: res.data.name || '',
+            role: res.data.role || '',
+            setting: res.data.setting || '',
+            context: res.data.context || '',
+            task: res.data.task || '',
+            constraints: res.data.constraints || '',
+            outputFormat: res.data.outputFormat || '',
+            examples: res.data.examples || '',
+            customFields: res.data.customFields || [],
+          });
+          setGeneratedPrompt(res.data.content || '');
+        })
+        .catch(() => setError('Failed to load prompt.'))
+        .finally(() => setLoading(false));
+    }
+  }, [promptId, projectId]);
 
   const updateField = (field: keyof PromptBuilder, value: string) => {
     setPromptBuilder(prev => ({ ...prev, [field]: value }));
@@ -141,9 +170,29 @@ export function PromptsConstructor({ projectId }: PromptsConstructorProps) {
     setGeneratedPrompt(prompt.trim());
   };
 
-  const savePrompt = () => {
-    // TODO: Implement save to backend
-    console.log('Saving prompt:', { name: promptBuilder.name, content: generatedPrompt });
+  const savePrompt = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload = {
+        name: promptBuilder.name,
+        content: generatedPrompt,
+        version: 1
+      };
+
+      if (promptId) {
+        await promptsApi.update(projectId, promptId, payload);
+        setSuccess('Prompt updated!');
+      } else {
+        await promptsApi.create(projectId, payload);
+        setSuccess('Prompt created!');
+      }
+    } catch (e) {
+      setError('Failed to save prompt.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -305,11 +354,22 @@ export function PromptsConstructor({ projectId }: PromptsConstructorProps) {
                 <Eye className="w-4 h-4 mr-2" />
                 Generate Preview
               </Button>
-              <Button variant="outline" onClick={savePrompt} disabled={!promptBuilder.name || !generatedPrompt}>
+              <Button 
+                variant="outline" 
+                onClick={savePrompt} 
+                disabled={!promptBuilder.name || !generatedPrompt || loading}
+              >
                 <Save className="w-4 h-4 mr-2" />
-                Save
+                {loading ? 'Saving...' : 'Save'}
               </Button>
             </div>
+
+            {error && (
+              <div className="text-sm text-red-500">{error}</div>
+            )}
+            {success && (
+              <div className="text-sm text-green-500">{success}</div>
+            )}
           </CardContent>
         </Card>
 
@@ -334,25 +394,9 @@ export function PromptsConstructor({ projectId }: PromptsConstructorProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedPrompt ? (
-              <div className="space-y-4">
-                <div className="bg-muted p-4 rounded-lg">
-                  <pre className="whitespace-pre-wrap text-sm">{generatedPrompt}</pre>
-                </div>
-                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                  <span>Characters: {generatedPrompt.length}</span>
-                  <span>Words: {generatedPrompt.split(' ').length}</span>
-                  <Badge variant="outline">
-                    Est. tokens: ~{Math.ceil(generatedPrompt.length / 4)}
-                  </Badge>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Fill out the form and click "Generate Preview" to see your prompt</p>
-              </div>
-            )}
+            <div className="whitespace-pre-wrap font-mono text-sm bg-muted p-4 rounded-lg">
+              {generatedPrompt || 'Generate a preview to see the formatted prompt here...'}
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -12,23 +12,42 @@ import {
   DollarSign,
   Target
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { projectsApi, promptsApi } from '@/lib/api';
 
 interface ProjectDashboardProps {
   projectId: string;
 }
 
 export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
-  // Mock data - replace with real API calls
-  const projectStats = {
-    totalPrompts: 24,
-    activePrompts: 18,
-    totalTests: 342,
-    successRate: 96.2,
-    avgLatency: 1.4,
-    totalCost: 12.45,
-    testsToday: 28,
-    lastTest: '2 minutes ago'
-  };
+  const [projectStats, setProjectStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchStats() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [projectRes, promptsRes] = await Promise.all([
+          projectsApi.get(projectId),
+          promptsApi.list(projectId),
+        ]);
+        setProjectStats({
+          ...projectRes.data,
+          totalPrompts: promptsRes.data.length,
+        });
+      } catch (e) {
+        setError('Failed to load project stats.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, [projectId]);
+
+  if (loading) return <div className="p-8 text-center">Loading project stats...</div>;
+  if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
   const recentActivity = [
     { id: 1, action: 'Prompt "Customer Support V3" tested with GPT-4', time: '2 min ago', status: 'success' },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,9 +21,11 @@ import {
   Download,
   Settings
 } from 'lucide-react';
+import { promptsApi } from '@/lib/api';
 
 interface PromptTestingProps {
   projectId: string;
+  promptId?: string | null;
 }
 
 interface TestResult {
@@ -37,11 +39,14 @@ interface TestResult {
   status: 'success' | 'error' | 'pending';
 }
 
-export function PromptTesting({ projectId }: PromptTestingProps) {
+export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
+  const [savedPrompts, setSavedPrompts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const availableModels = [
     { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI', cost: '$0.03/1K tokens' },
@@ -50,11 +55,25 @@ export function PromptTesting({ projectId }: PromptTestingProps) {
     { id: 'claude-3-haiku', name: 'Claude 3 Haiku', provider: 'Anthropic', cost: '$0.0025/1K tokens' },
   ];
 
-  const savedPrompts = [
-    { id: '1', name: 'Customer Support V3', content: 'You are a helpful customer support agent...' },
-    { id: '2', name: 'Product Description Generator', content: 'Create compelling product descriptions...' },
-    { id: '3', name: 'Email Response Template', content: 'Draft professional email responses...' },
-  ];
+  useEffect(() => {
+    async function fetchPrompts() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await promptsApi.list(projectId);
+        setSavedPrompts(res.data);
+        if (promptId) {
+          const found = res.data.find((p: any) => p.id === promptId);
+          if (found) setPrompt(found.content);
+        }
+      } catch (e) {
+        setError('Failed to load prompts.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPrompts();
+  }, [projectId, promptId]);
 
   const runTests = async () => {
     if (!prompt || selectedModels.length === 0) return;

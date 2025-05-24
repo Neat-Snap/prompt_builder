@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +16,11 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { Project } from '@/types';
+import { NewProjectDialog } from '@/components/project/NewProjectDialog';
 
 export function HomePage() {
   const { user, projects, addTab } = useAppStore();
+  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
 
   const openProject = (project: Project) => {
     addTab({
@@ -113,7 +116,7 @@ export function HomePage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Your Projects</h2>
-            <Button>
+            <Button onClick={() => setNewProjectDialogOpen(true)}>
               <FolderPlus className="w-4 h-4 mr-2" />
               New Project
             </Button>
@@ -156,6 +159,11 @@ export function HomePage() {
           </div>
         </div>
       </div>
+
+      <NewProjectDialog 
+        open={newProjectDialogOpen}
+        onOpenChange={setNewProjectDialogOpen}
+      />
     </div>
   );
 }

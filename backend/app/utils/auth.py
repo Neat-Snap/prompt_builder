@@ -6,10 +6,12 @@ import hashlib
 KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 EXP = settings.ACCESS_TOKEN_EXPIRE_HOURS
+AUD = settings.AUDIENCE
 
 def generate_jwt_token(email):
     payload = {
         "sub": email,
+        "aud": AUD,
         "exp": datetime.utcnow() + timedelta(hours=EXP)
     }
 

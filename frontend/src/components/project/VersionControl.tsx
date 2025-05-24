@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +19,11 @@ import {
   TrendingUp,
   RotateCcw
 } from 'lucide-react';
+import { promptsApi } from '@/lib/api';
 
 interface VersionControlProps {
   projectId: string;
+  promptId?: string | null;
 }
 
 interface PromptVersion {
@@ -43,67 +45,31 @@ interface PromptVersion {
   isActive: boolean;
 }
 
-export function VersionControl({ projectId }: VersionControlProps) {
+export function VersionControl({ projectId, promptId }: VersionControlProps) {
   const [selectedPrompt, setSelectedPrompt] = useState<string>('prompt-1');
   const [compareMode, setCompareMode] = useState(false);
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with real API calls
-  const promptVersions: PromptVersion[] = [
-    {
-      id: 'v1.0',
-      version: '1.0',
-      name: 'Initial Version',
-      content: 'You are a helpful customer support agent. Please assist the customer with their inquiry.',
-      author: 'John Doe',
-      createdAt: new Date('2024-01-15'),
-      metrics: {
-        testCount: 25,
-        successRate: 78.5,
-        avgLatency: 2100,
-        avgCost: 0.032
-      },
-      tags: ['baseline'],
-      notes: 'Initial implementation of customer support prompt',
-      isActive: false
-    },
-    {
-      id: 'v1.1',
-      version: '1.1',
-      name: 'Added Context Clarity',
-      content: 'You are a helpful and empathetic customer support agent. Please assist the customer with their inquiry, ensuring you understand their needs clearly before responding.',
-      author: 'Jane Smith',
-      createdAt: new Date('2024-01-22'),
-      parentVersion: 'v1.0',
-      metrics: {
-        testCount: 42,
-        successRate: 85.2,
-        avgLatency: 1950,
-        avgCost: 0.028
-      },
-      tags: ['improved', 'empathy'],
-      notes: 'Added empathy and clarity instructions',
-      isActive: false
-    },
-    {
-      id: 'v2.0',
-      version: '2.0',
-      name: 'Major Restructure',
-      content: 'You are a professional customer support specialist with expertise in problem-solving. Your role is to:\n1. Listen carefully to customer concerns\n2. Ask clarifying questions when needed\n3. Provide clear, actionable solutions\n4. Maintain a friendly and professional tone throughout',
-      author: 'Alice Johnson',
-      createdAt: new Date('2024-02-10'),
-      parentVersion: 'v1.1',
-      metrics: {
-        testCount: 67,
-        successRate: 92.1,
-        avgLatency: 1800,
-        avgCost: 0.025
-      },
-      tags: ['production', 'structured'],
-      notes: 'Complete restructure with step-by-step approach',
-      isActive: true
+  useEffect(() => {
+    async function fetchPromptVersions() {
+      setLoading(true);
+      setError(null);
+      try {
+        if (promptId) {
+          const res = await promptsApi.get(projectId, promptId);
+          setPromptVersions(res.data.versions || []);
+        }
+      } catch (e) {
+        setError('Failed to load prompt versions.');
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    fetchPromptVersions();
+  }, [projectId, promptId]);
 
   const prompts = [
     { id: 'prompt-1', name: 'Customer Support Agent' },

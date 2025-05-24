@@ -2,7 +2,7 @@ import os
 import sys
 from dotenv import load_dotenv
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..', "frontend"))
 print(project_root)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -14,5 +14,6 @@ class Settings:
     SECRET_KEY = os.getenv("SECRET_KEY")
     ALGORITHM = os.getenv("ALGORITHM")
     ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("ACCESS_TOKEN_EXPIRE_HOURS"))
+    AUDIENCE = os.getenv("AUDIENCE")
 
 settings = Settings()

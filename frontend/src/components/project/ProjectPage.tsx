@@ -16,6 +16,8 @@ import { PromptsConstructor } from './PromptsConstructor';
 import { PromptTesting } from './PromptTesting';
 import { VersionControl } from './VersionControl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { promptsApi } from '@/lib/api';
+import { NewPromptDialog } from './NewPromptDialog';
 
 interface ProjectPageProps {
   projectId: string;
@@ -33,19 +35,31 @@ const navigationItems = [
 export function ProjectPage({ projectId }: ProjectPageProps) {
   const [activeView, setActiveView] = useState<ProjectView>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedPromptId, setSelectedPromptId] = useState('prompt-1');
-  const [prompts, setPrompts] = useState([
-    { id: 'prompt-1', name: 'Customer Support V3' },
-    { id: 'prompt-2', name: 'Product Description Generator' },
-    { id: 'prompt-3', name: 'Email Response Template' },
-  ]);
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [prompts, setPrompts] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newPromptDialogOpen, setNewPromptDialogOpen] = useState(false);
+
+  const fetchPrompts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await promptsApi.list(projectId);
+      setPrompts(res.data);
+      if (res.data.length > 0 && !selectedPromptId) {
+        setSelectedPromptId(res.data[0].id);
+      }
+    } catch (err) {
+      setError('Failed to load prompts.');
+      setPrompts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setPrompts([
-      { id: 'prompt-1', name: 'Customer Support V3' },
-      { id: 'prompt-2', name: 'Product Description Generator' },
-      { id: 'prompt-3', name: 'Email Response Template' },
-    ]);
+    fetchPrompts();
   }, [projectId]);
 
   const renderContent = () => {
@@ -53,15 +67,18 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
       case 'dashboard':
         return <ProjectDashboard projectId={projectId} />;
       case 'constructor':
-        return <PromptsConstructor projectId={projectId} />;
+        return <PromptsConstructor projectId={projectId} promptId={selectedPromptId} />;
       case 'testing':
-        return <PromptTesting projectId={projectId} />;
+        return <PromptTesting projectId={projectId} promptId={selectedPromptId} />;
       case 'versions':
-        return <VersionControl projectId={projectId} />;
+        return <VersionControl projectId={projectId} promptId={selectedPromptId} />;
       default:
         return <ProjectDashboard projectId={projectId} />;
     }
   };
+
+  if (loading) return <div className="p-8 text-center">Loading prompts...</div>;
+  if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
   return (
     <div className="h-full flex">
@@ -87,7 +104,7 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
             <div className="mb-6">
               <div className="font-semibold text-xs text-muted-foreground mb-2">Active Prompt</div>
               <div className="flex items-center space-x-2 mb-2">
-                <Select value={selectedPromptId} onValueChange={setSelectedPromptId}>
+                <Select value={selectedPromptId ?? ''} onValueChange={setSelectedPromptId}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a prompt" />
                   </SelectTrigger>
@@ -100,33 +117,45 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" size="sm" className="w-full">New Prompt</Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => setNewPromptDialogOpen(true)}
+              >
+                New Prompt
+              </Button>
             </div>
           )}
-          <nav className="space-y-2">
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.id}
-                  variant={activeView === item.id ? 'default' : 'ghost'}
-                  className={`w-full justify-start ${!sidebarOpen && 'px-2'}`}
-                  onClick={() => setActiveView(item.id as ProjectView)}
-                >
-                  <Icon size={16} className={sidebarOpen ? 'mr-2' : ''} />
-                  {sidebarOpen && item.label}
-                </Button>
-              );
-            })}
+          
+          {/* Navigation */}
+          <nav className="space-y-1">
+            {navigationItems.map((item) => (
+              <Button
+                key={item.id}
+                variant={activeView === item.id ? 'default' : 'ghost'}
+                className="w-full justify-start"
+                onClick={() => setActiveView(item.id as ProjectView)}
+              >
+                <item.icon className="w-4 h-4 mr-2" />
+                {sidebarOpen && item.label}
+              </Button>
+            ))}
           </nav>
         </div>
       </div>
+
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="px-6 pb-6 pt-6">
-          {renderContent()}
-        </div>
+        {renderContent()}
       </div>
+
+      <NewPromptDialog
+        open={newPromptDialogOpen}
+        onOpenChange={setNewPromptDialogOpen}
+        projectId={projectId}
+        onPromptCreated={fetchPrompts}
+      />
     </div>
   );
 }

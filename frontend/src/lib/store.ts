@@ -14,6 +14,8 @@ interface AppState {
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
+  updateProject: (project: Project) => void;
+  removeProject: (projectId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -57,5 +59,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       tab.id === tabId ? { ...tab, ...updates } : tab
     );
     set({ tabs: newTabs });
+  },
+
+  updateProject: (project) => {
+    const { projects } = get();
+    set({ projects: projects.map(p => p.id === project.id ? project : p) });
+  },
+  removeProject: (projectId) => {
+    const { projects } = get();
+    set({ projects: projects.filter(p => p.id !== projectId) });
   },
 }));
