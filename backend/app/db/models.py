@@ -2,10 +2,14 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateT
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+import loguru
+from app.db.session import engine
+
+logger = loguru.logger
 
 Base = declarative_base()
 
-Class User(Base):
+class User(Base):
     __tablename__ = "users"
     id = Column(BigInteger, primary_key=True, index=True)
     name = Column(String, nullable=True)
@@ -20,7 +24,10 @@ Class User(Base):
 
     projects = relationship("Project", back_populates="user")
 
-Class Project(Base):
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class Project(Base):
     __tablename__ = "projects"
     id = Column(BigInteger, primary_key=True, index=True)
     name = Column(String, nullable=False)
@@ -33,7 +40,7 @@ Class Project(Base):
 
     prompts = relationship("Prompt", back_populates="project")
 
-Class Prompt(Base):
+class Prompt(Base):
     __tablename__ = "prompts"
     id = Column(BigInteger, primary_key=True, index=True)
     name = Column(String, nullable=False)
@@ -66,3 +73,5 @@ class Run(Base):
     prompt = relationship("Prompt", back_populates="runs")
     user = relationship("User")
     
+Base.metadata.create_all(bind=engine)
+logger.info("Created all tables")
