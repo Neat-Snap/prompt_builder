@@ -72,7 +72,7 @@ def set_users(users_data: List[dict]) -> bool:
         return False
 
 
-def find_user_by_email(email: str) -> dict:
+def get_user_by_email(email: str) -> dict:
     try:
         with get_db_session() as db:
             user = db.query(User).filter(User.email == email).first()

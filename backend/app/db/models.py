@@ -12,11 +12,11 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
     id = Column(BigInteger, primary_key=True, index=True)
-    name = Column(String, nullable=True)
+    name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True)
     created_at = Column(DateTime, default=func.now())
     is_verified = Column(Boolean, default=False)
-    hashed_password = Column(String)
+    hashed_password = Column(String, nullable=False)
     is_banned = Column(Boolean, default=False)
     last_login = Column(DateTime, nullable=True)
     role = Column(String, default="user")
@@ -40,6 +40,9 @@ class Project(Base):
 
     prompts = relationship("Prompt", back_populates="project")
 
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 class Prompt(Base):
     __tablename__ = "prompts"
     id = Column(BigInteger, primary_key=True, index=True)
@@ -47,6 +50,9 @@ class Prompt(Base):
     project_id = Column(BigInteger, ForeignKey("projects.id"))
     project = relationship("Project", back_populates="prompts")
     versions = relationship("PromptVersion", back_populates="prompt")
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class PromptVersion(Base):
     __tablename__ = "prompt_versions"
@@ -57,6 +63,9 @@ class PromptVersion(Base):
     prompt_text = Column(Text, nullable=False)
     created_at = Column(DateTime, default=func.now())
     runs = relationship("Run", back_populates="prompt_version")
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class Run(Base):
     __tablename__ = "runs"
@@ -72,6 +81,9 @@ class Run(Base):
 
     prompt = relationship("Prompt", back_populates="runs")
     user = relationship("User")
-    
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 Base.metadata.create_all(bind=engine)
 logger.info("Created all tables")
