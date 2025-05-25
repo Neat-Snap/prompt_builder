@@ -51,8 +51,16 @@ class Prompt(Base):
     name = Column(String, nullable=False)
     project_id = Column(BigInteger, ForeignKey("projects.id"))
     project = relationship("Project", back_populates="prompts")
-    versions = relationship("PromptVersion", back_populates="prompt")
+    versions = relationship("PromptVersion", back_populates="prompt", cascade="all, delete-orphan")
     runs = relationship("Run", back_populates="prompt")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if 'prompt_text' in kwargs:
+            self.versions.append(PromptVersion(
+                prompt_text=kwargs['prompt_text'],
+                version_number=1
+            ))
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -60,12 +68,26 @@ class Prompt(Base):
 class PromptVersion(Base):
     __tablename__ = "prompt_versions"
     id = Column(BigInteger, primary_key=True, index=True)
-    prompt_id = Column(BigInteger, ForeignKey("prompts.id"))
+    prompt_id = Column(BigInteger, ForeignKey("prompts.id", ondelete="CASCADE"))
     prompt = relationship("Prompt", back_populates="versions")
     version_number = Column(Integer, nullable=False)
     prompt_text = Column(Text, nullable=False)
     created_at = Column(DateTime, default=func.now())
+    comments = Column(JSON, nullable=True)
     runs = relationship("Run", back_populates="prompt_version")
+
+    def create_run(self, user_id=None, result=None, success=None, cost=None):
+        run = Run(
+            prompt_version_id=self.id,
+            prompt_id=self.prompt_id,
+            user_id=user_id,
+            result=result,
+            success=success,
+            cost=cost,
+            started_at=func.now()
+        )
+        self.runs.append(run)
+        return run
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -75,7 +97,7 @@ class Run(Base):
     id = Column(BigInteger, primary_key=True, index=True)
     prompt_version_id = Column(BigInteger, ForeignKey("prompt_versions.id"))
     prompt_version = relationship("PromptVersion", back_populates="runs")
-    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)  # if you want to track who ran it
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
     started_at = Column(DateTime, default=func.now())
     finished_at = Column(DateTime, nullable=True)
     cost = Column(Float, nullable=True)

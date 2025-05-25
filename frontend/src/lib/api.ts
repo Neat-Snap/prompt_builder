@@ -60,6 +60,9 @@ export const promptsApi = {
   get: (projectId: string, promptId: string) => api.get(`/users/projects/${projectId}/prompts/${promptId}`),
   update: (projectId: string, promptId: string, data: any) => api.put(`/users/projects/${projectId}/prompts/${promptId}`, data),
   delete: (projectId: string, promptId: string) => api.delete(`/users/projects/${projectId}/prompts/${promptId}`),
+  createVersion: (projectId: string, promptId: string, data: any) => api.post(`/users/projects/${projectId}/prompts/${promptId}/versions`, data),
+  updateVersion: (projectId: string, promptId: string, versionId: string, data: any) => api.put(`/users/projects/${projectId}/prompts/${promptId}/versions/${versionId}`, data),
+  getVersions: (projectId: string, promptId: string) => api.get(`/users/projects/${projectId}/prompts/${promptId}/versions`),
 };
 
 export default api;

@@ -26,9 +26,7 @@ export function NewPromptDialog({ open, onOpenChange, projectId, onPromptCreated
 
     try {
       await promptsApi.create(projectId, {
-        name,
-        prompt_textS: '', // Empty content initially
-        version: 1
+        name
       });
 
       // Reset form and close dialog

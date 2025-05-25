@@ -93,7 +93,7 @@ async def create_prompt_endpoint(request: Request, project_id: str):
         raise HTTPException(status_code=401, detail="Unauthorized")
     prompt = await request.json()
     prompt["project_id"] = project_id
-    return set_prompt(prompt)
+    return create_prompt_with_version(prompt)
 
 
 @router.get("/projects/{project_id}/prompts/{prompt_id}")
@@ -107,7 +107,7 @@ async def get_prompt_endpoint(request: Request, project_id: str, prompt_id: str)
 
 
 @router.put("/projects/{project_id}/prompts/{prompt_id}")
-async def update_prompt_endpoint(request: Request, project_id: str, prompt_id: str):
+async def update_prompt_version_endpoint(request: Request, project_id: str, prompt_id: str):
     email = request.state.email
     user_id = get_user_by_email(email)["id"]
     if user_id != get_project(project_id)["user_id"]:

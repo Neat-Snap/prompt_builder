@@ -175,17 +175,21 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
     setError(null);
     setSuccess(null);
     try {
-      const payload = {
-        name: promptBuilder.name,
-        content: generatedPrompt,
-        version: 1
-      };
-
       if (promptId) {
-        await promptsApi.update(projectId, promptId, payload);
-        setSuccess('Prompt updated!');
+        // Fetch existing versions to determine the next version number
+        const versionsRes = await promptsApi.getVersions(projectId, promptId);
+        const versions = versionsRes.data || [];
+        const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+        // Map all UI fields into a single prompt_text string
+        const prompt_text = generatedPrompt;
+        await promptsApi.createVersion(projectId, promptId, {
+          version_number: nextVersion,
+          prompt_text
+        });
+        setSuccess('New version created!');
       } else {
-        await promptsApi.create(projectId, payload);
+        // Only send name when creating a new prompt
+        await promptsApi.create(projectId, { name: promptBuilder.name });
         setSuccess('Prompt created!');
       }
     } catch (e) {

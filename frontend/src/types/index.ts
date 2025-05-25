@@ -28,14 +28,25 @@ export interface ApiKey {
 export interface Prompt {
   id: string;
   name: string;
+  projectId: string;
+  createdAt: Date;
+  versions: PromptVersion[];
+}
+
+export interface PromptVersion {
+  id: string;
   version: number;
   content: string;
   role?: string;
   setting?: string;
   context?: string;
+  task?: string;
+  constraints?: string;
   outputFormat?: string;
+  examples?: string;
+  customFields?: { key: string; value: string }[];
   createdAt: Date;
-  projectId: string;
+  isActive: boolean;
 }
 
 export interface TestResult {

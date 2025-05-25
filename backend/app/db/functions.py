@@ -200,14 +200,37 @@ def get_project_prompts(project_id: int) -> List[dict]:
         logger.error(f"Error getting project prompts: {traceback.format_exc()}")
         return []
 
+
+def get_project_prompt_versions(project_id: int, prompt_id: int) -> List[dict]:
+    try:
+        with get_db_session() as db:
+            prompt = db.query(Prompt).filter(Prompt.project_id == project_id, Prompt.id == prompt_id).first()
+            if not prompt:
+                return []
+            return [version.to_dict() for version in prompt.versions]
+    except Exception as e:
+        logger.error(f"Error getting project prompt versions: {traceback.format_exc()}")
+        return []
+
+
 # Prompt functions
-def get_prompt(prompt_id: int) -> dict:
+def get_prompt(prompt_id: int, include_runs = False) -> dict:
     try:
         with get_db_session() as db:
             prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
             if not prompt:
                 return False
-            return prompt.to_dict()
+            prompt_dict = prompt.to_dict()
+
+            versions = prompt.versions
+            for version in versions:
+                version_dict = version.to_dict()
+                if include_runs:
+                    version_dict['runs'] = [run.to_dict() for run in version.runs]
+                else:
+                    del version_dict['runs']
+                prompt_dict['versions'].append(version_dict)
+            return prompt_dict
     except Exception as e:
         logger.error(f"Error getting prompt: {traceback.format_exc()}")
         return False
@@ -248,20 +271,31 @@ def create_prompt(prompt_data: dict, project_id: int) -> bool:
         return False
 
 
+def create_prompt_with_version(prompt_data: dict) -> bool:
+    try:
+        with get_db_session() as db:
+            prompt = Prompt(**prompt_data)
+            db.add(prompt)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error creating prompt with version: {traceback.format_exc()}")
+        return False
+
 def set_prompt(prompt_data: dict) -> bool:
     try:
         prompt_id = prompt_data.get("id")
         with get_db_session() as db:
-            prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first() if prompt_id else None
-            if not prompt:
-                prompt = Prompt(**prompt_data)
-                db.add(prompt)
+            prompt_version = db.query(PromptVersion).filter(PromptVersion.id == prompt_id).first() if prompt_id else None
+            if not prompt_version:
+                prompt_version = PromptVersion(**prompt_data)
+                db.add(prompt_version)
                 db.commit()
                 return True
             for key, value in prompt_data.items():
-                if hasattr(prompt, key):
-                    setattr(prompt, key, value)
-            db.add(prompt)
+                if hasattr(prompt_version, key):
+                    setattr(prompt_version, key, value)
+            db.add(prompt_version)
             db.commit()
             return True
     except Exception as e:
