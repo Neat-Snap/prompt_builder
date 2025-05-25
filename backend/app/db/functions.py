@@ -223,6 +223,9 @@ def get_prompt(prompt_id: int, include_runs = False) -> dict:
             prompt_dict = prompt.to_dict()
 
             versions = prompt.versions
+            if not versions:
+                prompt_dict['versions'] = []
+                return prompt_dict
             for version in versions:
                 version_dict = version.to_dict()
                 if include_runs:
@@ -282,7 +285,7 @@ def create_prompt_with_version(prompt_data: dict) -> bool:
         logger.error(f"Error creating prompt with version: {traceback.format_exc()}")
         return False
 
-def set_prompt(prompt_data: dict) -> bool:
+def set_prompt_version(prompt_data: dict) -> bool:
     try:
         prompt_id = prompt_data.get("id")
         with get_db_session() as db:
