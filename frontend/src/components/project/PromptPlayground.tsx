@@ -37,6 +37,10 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const modelSearchTimeout = useRef<NodeJS.Timeout | null>(null);
   const [selectedModelObj, setSelectedModelObj] = useState<any>(null);
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedPrompt = useRef<string>('');
+  const [promptLoaded, setPromptLoaded] = useState(false);
+  const didUnmount = useRef(false);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -54,10 +58,12 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
             const versions = promptRes.data.versions || [];
             const latest = versions[versions.length - 1];
             setPrompt(latest?.prompt_text || '');
+            setPromptLoaded(true);
           }
         }
       } catch (e) {
         setError('Failed to load prompts.');
+        setPromptLoaded(false);
       } finally {
         setLoading(false);
       }
@@ -82,25 +88,58 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
     }
   };
 
-  const handleSave = async () => {
+  // Autosave effect for prompt
+  useEffect(() => {
     if (!selectedPromptId) return;
+    if (!promptLoaded) return;
+    if (prompt === lastSavedPrompt.current) return;
+    if (!prompt && lastSavedPrompt.current) return; // Don't erase existing prompt
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
     setSaving(true);
-    setError(null);
-    try {
-      // Get current versions to determine next version number
-      const promptRes = await promptsApi.get(projectId, selectedPromptId);
-      const versions = promptRes.data.versions || [];
-      const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
-      await promptsApi.update(projectId, selectedPromptId, {
-        version_number: nextVersion,
-        prompt_text: prompt
-      });
-    } catch (e) {
-      setError('Failed to save prompt.');
-    } finally {
-      setSaving(false);
-    }
-  };
+    saveTimeout.current = setTimeout(async () => {
+      try {
+        const promptRes = await promptsApi.get(projectId, selectedPromptId);
+        const versions = promptRes.data.versions || [];
+        const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+        await promptsApi.update(projectId, selectedPromptId, {
+          version_number: nextVersion,
+          prompt_text: prompt
+        });
+        lastSavedPrompt.current = prompt;
+      } catch (e) {
+        // Optionally handle error
+      } finally {
+        setSaving(false);
+      }
+    }, 800);
+    // eslint-disable-next-line
+  }, [prompt, selectedPromptId, promptLoaded]);
+
+  // Save immediately when switching prompts
+  useEffect(() => {
+    didUnmount.current = false;
+    return () => {
+      didUnmount.current = true;
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      if (!promptLoaded) return;
+      if (selectedPromptId && prompt !== lastSavedPrompt.current) {
+        if (!prompt && lastSavedPrompt.current) return;
+        // Prevent save if unmounting due to reset
+        if (didUnmount.current) return;
+        setSaving(true);
+        promptsApi.get(projectId, selectedPromptId).then(promptRes => {
+          const versions = promptRes.data.versions || [];
+          const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+          return promptsApi.update(projectId, selectedPromptId, {
+            version_number: nextVersion,
+            prompt_text: prompt
+          });
+        }).finally(() => setSaving(false));
+        lastSavedPrompt.current = prompt;
+      }
+    };
+    // eslint-disable-next-line
+  }, [selectedPromptId, promptLoaded]);
 
   // Model search effect
   useEffect(() => {
@@ -165,10 +204,6 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="sm" onClick={handleSave} disabled={!selectedPromptId || saving}>
-                  <Save className="w-4 h-4 mr-2" />
-                  {saving ? 'Saving...' : 'Save'}
-                </Button>
               </div>
             </CardTitle>
             {/* <div className="text-xs text-muted-foreground mt-1">This prompt will be sent as the <b>system prompt</b> to the model.</div> */}
@@ -197,6 +232,11 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                 This will be sent as the <b>user prompt</b> to the model.
               </div> */}
             </div>
+            {/* {saving && (
+              <div className="absolute bottom-3 right-6 text-xs text-muted-foreground pointer-events-none select-none">
+                Saving...
+              </div>
+            )} */}
           </CardContent>
         </Card>
         {/* Playground Controls */}

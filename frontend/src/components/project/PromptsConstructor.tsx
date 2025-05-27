@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +68,11 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [newCustomBlockName, setNewCustomBlockName] = useState('');
+  const [promptLoaded, setPromptLoaded] = useState(false);
+
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedPrompt = useRef<string>('');
+  const didUnmount = useRef(false);
 
   const resetForm = () => {
     setPromptBuilder({
@@ -114,16 +119,72 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
             blocks
           });
           setGeneratedPrompt(latestVersion?.prompt_text || '');
+          setPromptLoaded(true);
         })
         .catch(() => {
           setError('Failed to load prompt.');
           resetForm();
+          setPromptLoaded(false);
         })
         .finally(() => setLoading(false));
     } else {
       resetForm();
+      setPromptLoaded(false);
     }
   }, [promptId, projectId]);
+
+  // Autosave effect for generatedPrompt
+  useEffect(() => {
+    if (!promptId) return;
+    if (!promptLoaded) return;
+    if (generatedPrompt === lastSavedPrompt.current) return;
+    if (!generatedPrompt && lastSavedPrompt.current) return;
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    setLoading(true);
+    saveTimeout.current = setTimeout(async () => {
+      try {
+        const promptRes = await promptsApi.get(projectId, promptId);
+        const versions = (promptRes.data && promptRes.data.versions) ? promptRes.data.versions : [];
+        const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+        await promptsApi.update(projectId, promptId, {
+          version_number: nextVersion,
+          prompt_text: generatedPrompt
+        });
+        lastSavedPrompt.current = generatedPrompt;
+      } catch (e) {
+        // Optionally handle error
+      } finally {
+        setLoading(false);
+      }
+    }, 800);
+    // eslint-disable-next-line
+  }, [generatedPrompt, promptId, promptLoaded]);
+
+  // Save immediately when switching prompts
+  useEffect(() => {
+    didUnmount.current = false;
+    return () => {
+      didUnmount.current = true;
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      if (!promptLoaded) return;
+      if (promptId && generatedPrompt !== lastSavedPrompt.current) {
+        if (!generatedPrompt && lastSavedPrompt.current) return;
+        // Prevent save if unmounting due to reset
+        if (didUnmount.current) return;
+        setLoading(true);
+        promptsApi.get(projectId, promptId).then(promptRes => {
+          const versions = (promptRes.data && promptRes.data.versions) ? promptRes.data.versions : [];
+          const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+          return promptsApi.update(projectId, promptId, {
+            version_number: nextVersion,
+            prompt_text: generatedPrompt
+          });
+        }).finally(() => setLoading(false));
+        lastSavedPrompt.current = generatedPrompt;
+      }
+    };
+    // eslint-disable-next-line
+  }, [promptId, promptLoaded]);
 
   const updateGeneratedPrompt = (blocks: PromptBlock[]) => {
     let prompt = '';
@@ -290,18 +351,10 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button 
-                  variant="outline" 
-                  onClick={savePrompt} 
-                  disabled={!promptBuilder.name || !generatedPrompt || loading}
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {loading ? 'Saving...' : 'Save'}
-                </Button>
               </div>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 relative">
             <div>
               <Label htmlFor="prompt-name">Prompt Name</Label>
               <Input
@@ -381,6 +434,11 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
             {success && (
               <div className="text-sm text-green-500">{success}</div>
             )}
+            {/* {loading && (
+              <div className="absolute bottom-3 right-6 text-xs text-muted-foreground pointer-events-none select-none">
+                Saving...
+              </div>
+            )} */}
           </CardContent>
         </Card>
 
