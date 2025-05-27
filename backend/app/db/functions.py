@@ -359,16 +359,22 @@ def get_prompt_versions_by_prompt(prompt_id: int) -> List[dict]:
         logger.error(f"Error getting prompt versions by prompt: {traceback.format_exc()}")
         return []
 
-def set_prompt_version(version_data: dict) -> bool:
+def set_prompt_version(version_data: dict, latest_version: bool = True) -> bool:
     try:
         version_id = version_data.get("id")
+        logger.debug(f"Setting prompt version: {version_id}")
         with get_db_session() as db:
-            version = db.query(PromptVersion).filter(PromptVersion.id == version_id).first() if version_id else None
+            if latest_version:
+                version = db.query(PromptVersion).filter(PromptVersion.prompt_id == version_data.get("prompt_id")).order_by(PromptVersion.version_number.desc()).first()
+            else:
+                version = db.query(PromptVersion).filter(PromptVersion.id == version_id).first() if version_id else None
             if not version:
+                logger.debug(f"Creating new prompt version: {version_data}")
                 version = PromptVersion(**version_data)
                 db.add(version)
                 db.commit()
                 return True
+            logger.debug(f"Updating existing prompt version: {version_data}")
             for key, value in version_data.items():
                 if hasattr(version, key):
                     setattr(version, key, value)

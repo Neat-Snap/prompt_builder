@@ -74,32 +74,36 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
       setLoading(true);
       promptsApi.get(projectId, promptId)
         .then(res => {
-          // Map API data to promptBuilder state
           const blocks: PromptBlock[] = [];
-          if (res.data.role) blocks.push({ id: 'role', type: 'role', content: res.data.role, isExpanded: true });
-          if (res.data.context) blocks.push({ id: 'context', type: 'context', content: res.data.context, isExpanded: true });
-          if (res.data.task) blocks.push({ id: 'task', type: 'task', content: res.data.task, isExpanded: true });
-          if (res.data.constraints) blocks.push({ id: 'constraints', type: 'constraints', content: res.data.constraints, isExpanded: true });
-          if (res.data.outputFormat) blocks.push({ id: 'outputFormat', type: 'outputFormat', content: res.data.outputFormat, isExpanded: true });
-          if (res.data.examples) blocks.push({ id: 'examples', type: 'examples', content: res.data.examples, isExpanded: true });
           
-          if (res.data.customFields) {
-            res.data.customFields.forEach((field: { key: string; value: string }, index: number) => {
+          // Get the latest version's prompt text
+          const versions = res.data.versions || [];
+          const latestVersion = versions[versions.length - 1];
+          
+          if (latestVersion?.prompt_text) {
+            // Parse the prompt text to extract blocks
+            const tagRegex = /<([^>]+)>\n([\s\S]*?)\n<\/\1>/g;
+            let match;
+            
+            while ((match = tagRegex.exec(latestVersion.prompt_text)) !== null) {
+              const [_, tagName, content] = match;
+              const isCustom = !Object.keys(PREDEFINED_BLOCK_TYPES).includes(tagName.toLowerCase());
+              
               blocks.push({
-                id: `custom-${index}`,
-                type: field.key,
-                content: field.value,
+                id: `${tagName.toLowerCase()}-${Date.now()}-${blocks.length}`,
+                type: isCustom ? tagName : tagName.toLowerCase(),
+                content: content.trim(),
                 isExpanded: true,
-                isCustom: true
+                isCustom
               });
-            });
+            }
           }
 
           setPromptBuilder({
             name: res.data.name || '',
             blocks
           });
-          updateGeneratedPrompt(blocks);
+          setGeneratedPrompt(latestVersion?.prompt_text || '');
         })
         .catch(() => setError('Failed to load prompt.'))
         .finally(() => setLoading(false));
@@ -110,29 +114,9 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
     let prompt = '';
     
     blocks.forEach(block => {
-      if (block.isCustom) {
-        prompt += `${block.type}: ${block.content}\n\n`;
-      } else {
-        switch (block.type) {
-          case 'role':
-            prompt += `You are ${block.content}.\n\n`;
-            break;
-          case 'context':
-            prompt += `Context: ${block.content}\n\n`;
-            break;
-          case 'task':
-            prompt += `Task: ${block.content}\n\n`;
-            break;
-          case 'constraints':
-            prompt += `Constraints:\n${block.content}\n\n`;
-            break;
-          case 'outputFormat':
-            prompt += `Output Format: ${block.content}\n\n`;
-            break;
-          case 'examples':
-            prompt += `Examples:\n${block.content}\n\n`;
-            break;
-        }
+      if (block.content.trim()) {
+        const tagName = block.isCustom ? block.type : block.type.charAt(0).toUpperCase() + block.type.slice(1);
+        prompt += `<${tagName}>\n${block.content.trim()}\n</${tagName}>\n\n`;
       }
     });
     
