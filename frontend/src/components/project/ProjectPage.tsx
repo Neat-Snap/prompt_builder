@@ -18,17 +18,21 @@ import { VersionControl } from './VersionControl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { promptsApi } from '@/lib/api';
 import { NewPromptDialog } from './NewPromptDialog';
+import { PromptPlayground } from './PromptPlayground';
+import { PromptTestSuite } from './PromptTestSuite';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface ProjectPageProps {
   projectId: string;
 }
 
-type ProjectView = 'dashboard' | 'constructor' | 'testing' | 'versions';
+type ProjectView = 'dashboard' | 'constructor' | 'playground' | 'testing' | 'versions';
 
 const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'constructor', label: 'Prompt Constructor', icon: Wrench },
-  { id: 'testing', label: 'Testing Panel', icon: Play },
+  { id: 'playground', label: 'Playground', icon: Play },
+  { id: 'testing', label: 'Testing', icon: Play },
   { id: 'versions', label: 'Version Control', icon: GitBranch },
 ];
 
@@ -68,8 +72,10 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
         return <ProjectDashboard projectId={projectId} />;
       case 'constructor':
         return <PromptsConstructor projectId={projectId} promptId={selectedPromptId} />;
+      case 'playground':
+        return <PromptPlayground projectId={projectId} promptId={selectedPromptId} />;
       case 'testing':
-        return <PromptTesting projectId={projectId} promptId={selectedPromptId} />;
+        return <PromptTestSuite projectId={projectId} promptId={selectedPromptId} />;
       case 'versions':
         return <VersionControl projectId={projectId} promptId={selectedPromptId} />;
       default:
