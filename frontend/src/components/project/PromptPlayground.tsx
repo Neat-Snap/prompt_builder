@@ -22,6 +22,7 @@ const availableModels = [
 
 export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps) {
   const [prompt, setPrompt] = useState('');
+  const [userPrompt, setUserPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [response, setResponse] = useState<string>('');
@@ -123,14 +124,13 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
   }, [modelSearch]);
 
   const runPlayground = async () => {
-    if (!prompt || !selectedModel) return;
+    if (!prompt || !selectedModel || !userPrompt) return;
     setIsRunning(true);
     setResponse('');
     setError(null);
     try {
-      // You can customize the system prompt as needed
-      const systemPrompt = 'You are a helpful assistant.';
-      const res = await llmApi.request(systemPrompt, prompt, selectedModel);
+      const systemPrompt = prompt;
+      const res = await llmApi.request(systemPrompt, userPrompt, selectedModel);
       setResponse(res.data.result);
     } catch (e: any) {
       setError(e?.response?.data?.error || 'Failed to get response from LLM.');
@@ -151,7 +151,7 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Prompt</span>
+              <span>System Prompt</span>
               <div className="flex space-x-2">
                 <Select value={selectedPromptId ?? ''} onValueChange={handleSelectPrompt}>
                   <SelectTrigger className="w-48">
@@ -171,17 +171,31 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                 </Button>
               </div>
             </CardTitle>
+            {/* <div className="text-xs text-muted-foreground mt-1">This prompt will be sent as the <b>system prompt</b> to the model.</div> */}
           </CardHeader>
           <CardContent>
             <Textarea
-              placeholder="Enter your prompt here..."
+              placeholder="Enter your prompt here... (system prompt)"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              className="min-h-[200px] resize-none"
+              className="min-h-[120px] resize-none"
               disabled={loading || !selectedPromptId}
             />
             <div className="mt-2 text-sm text-muted-foreground">
               Characters: {prompt?.length || 0} • Est. tokens: ~{Math.ceil((prompt?.length || 0) / 4)}
+            </div>
+            <div className="mt-6">
+              <label className="block text-sm font-medium mb-1">Example User Prompt</label>
+              <Textarea
+                placeholder="Enter an example user prompt..."
+                value={userPrompt}
+                onChange={e => setUserPrompt(e.target.value)}
+                className="min-h-[80px] resize-none"
+                disabled={loading}
+              />
+              {/* <div className="mt-2 text-xs text-muted-foreground">
+                This will be sent as the <b>user prompt</b> to the model.
+              </div> */}
             </div>
           </CardContent>
         </Card>
@@ -195,7 +209,7 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
               <div className="relative">
                 <input
                   type="text"
-                  className={`w-full border rounded px-3 py-2 text-sm pr-10 ${selectedModelObj ? 'bg-green-50 cursor-default' : ''}`}
+                  className={`w-full border rounded px-3 py-2 text-sm pr-10 ${selectedModelObj ? 'bg-green-50 cursor-pointer' : ''}`}
                   placeholder="Search models..."
                   value={selectedModelObj ? selectedModelObj.name : modelSearch}
                   onChange={e => {
@@ -204,10 +218,18 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                       setModelDropdownOpen(true);
                     }
                   }}
-                  onFocus={() => {
-                    if (!selectedModelObj) setModelDropdownOpen(true);
+                  onFocus={e => {
+                    if (selectedModelObj) {
+                      setSelectedModel('');
+                      setSelectedModelObj(null);
+                      setModelSearch('');
+                      setModelDropdownOpen(true);
+                      // Focus input after clearing
+                      setTimeout(() => e.target.select(), 0);
+                    } else {
+                      setModelDropdownOpen(true);
+                    }
                   }}
-                  disabled={!!selectedModelObj}
                   readOnly={!!selectedModelObj}
                 />
                 {selectedModelObj ? (
@@ -219,7 +241,7 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                         setSelectedModel('');
                         setSelectedModelObj(null);
                         setModelSearch('');
-                        setModelDropdownOpen(false);
+                        setModelDropdownOpen(true);
                       }}
                       tabIndex={-1}
                       type="button"
@@ -258,7 +280,7 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
               </div>
               <Button 
                 onClick={runPlayground} 
-                disabled={!prompt || isRunning || !selectedModel}
+                disabled={!prompt || !userPrompt || isRunning || !selectedModel}
                 className="w-full"
               >
                 {isRunning ? (
