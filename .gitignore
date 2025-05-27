@@ -5,3 +5,7 @@
 .env.test.local
 .env.production.local
 *node_modules*
+*next-env*
+
+*__pycache__/*
+*.pyc

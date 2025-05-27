@@ -69,6 +69,16 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
   const [success, setSuccess] = useState<string | null>(null);
   const [newCustomBlockName, setNewCustomBlockName] = useState('');
 
+  const resetForm = () => {
+    setPromptBuilder({
+      name: '',
+      blocks: []
+    });
+    setGeneratedPrompt('');
+    setError(null);
+    setSuccess(null);
+  };
+
   useEffect(() => {
     if (promptId) {
       setLoading(true);
@@ -105,8 +115,13 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
           });
           setGeneratedPrompt(latestVersion?.prompt_text || '');
         })
-        .catch(() => setError('Failed to load prompt.'))
+        .catch(() => {
+          setError('Failed to load prompt.');
+          resetForm();
+        })
         .finally(() => setLoading(false));
+    } else {
+      resetForm();
     }
   }, [promptId, projectId]);
 

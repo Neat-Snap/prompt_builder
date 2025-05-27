@@ -135,6 +135,7 @@ async def update_prompt_version_endpoint(request: Request, project_id: str, prom
     if user_id != get_project(project_id)["user_id"]:
         raise HTTPException(status_code=401, detail="Unauthorized")
     prompt = await request.json()
+    prompt["prompt_id"] = prompt_id
     return set_prompt_version(prompt)
 
 

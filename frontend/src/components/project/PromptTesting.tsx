@@ -170,7 +170,7 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
                 className="min-h-[200px] resize-none"
               />
               <div className="mt-2 text-sm text-muted-foreground">
-                Characters: {prompt.length} • Est. tokens: ~{Math.ceil(prompt.length / 4)}
+                Characters: {prompt?.length || 0} • Est. tokens: ~{Math.ceil((prompt?.length || 0) / 4)}
               </div>
             </CardContent>
           </Card>

@@ -54,6 +54,32 @@ def create_user(user_data):
         return False
 
 
+
+def get_user_keys(email: str) -> dict:
+    try:
+        with get_db_session() as db:
+            user = db.query(User).filter(User.email == email).first()
+            if not user:
+                return False
+            return user.keys
+    except Exception as e:
+        logger.error(f"Error getting user keys: {traceback.format_exc()}")
+        return False
+
+def set_user_keys(email: str, keys: dict) -> bool:
+    try:
+        with get_db_session() as db:
+            user = db.query(User).filter(User.email == email).first()
+            if not user:
+                return False
+            user.keys = keys
+            db.add(user)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error setting user keys: {traceback.format_exc()}")
+        return False
+
 def set_user(user_data: dict) -> bool:
     try:
         user_id = user_data.get("id")
@@ -222,16 +248,19 @@ def get_prompt(prompt_id: int, include_runs = False) -> dict:
                 return False
             prompt_dict = prompt.to_dict()
 
-            versions = prompt.versions
+            versions = db.query(PromptVersion).filter(PromptVersion.prompt_id == prompt_id).order_by(PromptVersion.version_number.desc()).all()
             if not versions:
                 prompt_dict['versions'] = []
                 return prompt_dict
+            
+            if "versions" not in prompt_dict:
+                prompt_dict['versions'] = []
             for version in versions:
                 version_dict = version.to_dict()
-                if include_runs:
-                    version_dict['runs'] = [run.to_dict() for run in version.runs]
-                else:
-                    del version_dict['runs']
+                # if include_runs:
+                #     version_dict['runs'] = [run.to_dict() for run in version.runs]
+                # else:
+                #     del version_dict['runs']
                 prompt_dict['versions'].append(version_dict)
             return prompt_dict
     except Exception as e:
