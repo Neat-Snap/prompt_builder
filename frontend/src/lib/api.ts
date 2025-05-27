@@ -63,4 +63,10 @@ export const promptsApi = {
   getVersions: (projectId: string, promptId: string) => api.get(`/users/projects/${projectId}/prompts/${promptId}`),
 };
 
+export const llmApi = {
+  request: (system_prompt: string, user_prompt: string, model: string) =>
+    api.post('/llm/request', { system_prompt, user_prompt, model }),
+  searchModels: (q: string) => api.get(`/llm/search?q=${encodeURIComponent(q)}`),
+};
+
 export default api;

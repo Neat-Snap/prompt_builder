@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +17,38 @@ import {
 import { useAppStore } from '@/lib/store';
 import { Project } from '@/types';
 import { NewProjectDialog } from '@/components/project/NewProjectDialog';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import api from '@/lib/api';
 
 export function HomePage() {
   const { user, projects, addTab } = useAppStore();
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [openrouterKey, setOpenrouterKey] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string|null>(null);
+
+  useEffect(() => {
+    if (settingsOpen) {
+      api.get('/llm/keys').then(res => {
+        setOpenrouterKey(res.data?.keys?.openrouter || '');
+      });
+    }
+  }, [settingsOpen]);
+
+  const handleSaveKey = async () => {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await api.post('/llm/openrouter_key', { openrouter_key: openrouterKey });
+      setSaveMsg('Key saved!');
+    } catch (e) {
+      setSaveMsg('Failed to save key.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const openProject = (project: Project) => {
     addTab({
@@ -44,10 +72,41 @@ export function HomePage() {
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Settings</DialogTitle>
+                  <DialogDescription>Manage your account and API keys.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">OpenRouter API Key</label>
+                    <Input
+                      type="text"
+                      value={openrouterKey}
+                      onChange={e => setOpenrouterKey(e.target.value)}
+                      placeholder="sk-..."
+                      disabled={saving}
+                    />
+                  </div>
+                  <Button onClick={handleSaveKey} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Key'}
+                  </Button>
+                  {saveMsg && <div className="text-sm mt-2">{saveMsg}</div>}
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Close</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Avatar>
               <AvatarImage src={user?.avatar} />
               <AvatarFallback>

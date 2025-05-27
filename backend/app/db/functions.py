@@ -60,8 +60,9 @@ def get_user_keys(email: str) -> dict:
         with get_db_session() as db:
             user = db.query(User).filter(User.email == email).first()
             if not user:
-                return False
-            return user.keys
+                return {}
+            logger.debug(f"User keys: {user.keys}")
+            return user.keys if user.keys else {}
     except Exception as e:
         logger.error(f"Error getting user keys: {traceback.format_exc()}")
         return False

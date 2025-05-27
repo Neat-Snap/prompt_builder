@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Play, RefreshCw, Copy, Save } from 'lucide-react';
-import { promptsApi } from '@/lib/api';
+import { Play, RefreshCw, Copy, Save, Check, X as XIcon } from 'lucide-react';
+import { promptsApi, llmApi } from '@/lib/api';
 
 interface PromptPlaygroundProps {
   projectId: string;
@@ -22,7 +22,7 @@ const availableModels = [
 
 export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps) {
   const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState<string>('gpt-4');
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [response, setResponse] = useState<string>('');
   const [savedPrompts, setSavedPrompts] = useState<any[]>([]);
@@ -30,6 +30,12 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modelSearch, setModelSearch] = useState('');
+  const [modelResults, setModelResults] = useState<any[]>([]);
+  const [modelSearchLoading, setModelSearchLoading] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const modelSearchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [selectedModelObj, setSelectedModelObj] = useState<any>(null);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -95,15 +101,42 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
     }
   };
 
+  // Model search effect
+  useEffect(() => {
+    if (!modelSearch) {
+      setModelResults([]);
+      return;
+    }
+    setModelSearchLoading(true);
+    if (modelSearchTimeout.current) clearTimeout(modelSearchTimeout.current);
+    modelSearchTimeout.current = setTimeout(async () => {
+      try {
+        const res = await llmApi.searchModels(modelSearch);
+        setModelResults(res.data.models);
+      } catch {
+        setModelResults([]);
+      } finally {
+        setModelSearchLoading(false);
+      }
+    }, 400);
+    // eslint-disable-next-line
+  }, [modelSearch]);
+
   const runPlayground = async () => {
     if (!prompt || !selectedModel) return;
     setIsRunning(true);
     setResponse('');
-    // Simulate API call
-    setTimeout(() => {
-      setResponse(`This is a mock response from ${selectedModel}.`);
+    setError(null);
+    try {
+      // You can customize the system prompt as needed
+      const systemPrompt = 'You are a helpful assistant.';
+      const res = await llmApi.request(systemPrompt, prompt, selectedModel);
+      setResponse(res.data.result);
+    } catch (e: any) {
+      setError(e?.response?.data?.error || 'Failed to get response from LLM.');
+    } finally {
       setIsRunning(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -159,21 +192,73 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
               <CardTitle>Model & Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableModels.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name} <span className="text-xs text-muted-foreground ml-2">({model.provider})</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className={`w-full border rounded px-3 py-2 text-sm pr-10 ${selectedModelObj ? 'bg-green-50 cursor-default' : ''}`}
+                  placeholder="Search models..."
+                  value={selectedModelObj ? selectedModelObj.name : modelSearch}
+                  onChange={e => {
+                    if (!selectedModelObj) {
+                      setModelSearch(e.target.value);
+                      setModelDropdownOpen(true);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (!selectedModelObj) setModelDropdownOpen(true);
+                  }}
+                  disabled={!!selectedModelObj}
+                  readOnly={!!selectedModelObj}
+                />
+                {selectedModelObj ? (
+                  <>
+                    <Check className="absolute right-8 top-1/2 -translate-y-1/2 text-green-600 w-5 h-5" />
+                    <button
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      onClick={() => {
+                        setSelectedModel('');
+                        setSelectedModelObj(null);
+                        setModelSearch('');
+                        setModelDropdownOpen(false);
+                      }}
+                      tabIndex={-1}
+                      type="button"
+                    >
+                      <XIcon className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : null}
+                {modelDropdownOpen && modelSearch && !selectedModelObj && (
+                  <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-60 overflow-auto">
+                    {modelSearchLoading ? (
+                      <div className="p-2 text-sm text-muted-foreground">Searching...</div>
+                    ) : modelResults.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">No models found.</div>
+                    ) : (
+                      modelResults.map((model) => (
+                        <div
+                          key={model.slug}
+                          className={`px-3 py-2 cursor-pointer hover:bg-accent flex items-center justify-between ${selectedModel === model.slug ? 'bg-accent' : ''}`}
+                          onClick={() => {
+                            setSelectedModel(model.slug);
+                            setSelectedModelObj(model);
+                            setModelDropdownOpen(false);
+                          }}
+                        >
+                          <div>
+                            <div className="font-medium">{model.name}</div>
+                            <div className="text-xs text-muted-foreground">{model.author}</div>
+                          </div>
+                          {model.is_free && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Free</span>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <Button 
                 onClick={runPlayground} 
-                disabled={!prompt || isRunning}
+                disabled={!prompt || isRunning || !selectedModel}
                 className="w-full"
               >
                 {isRunning ? (
