@@ -61,3 +61,4 @@ async def delete_testset_endpoint(request: Request, testset_id: int):
     user = get_user_by_email(email)
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    return delete_testset(testset_id)

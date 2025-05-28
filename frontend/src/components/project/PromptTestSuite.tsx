@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Play, RefreshCw, Copy, Upload } from 'lucide-react';
+import { Play, RefreshCw, Copy, Upload, Trash } from 'lucide-react';
 import { promptsApi, testsetsApi } from '@/lib/api';
 import type { TestSet, TestSetTest } from '@/types';
 
@@ -208,31 +208,41 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
         <p className="text-muted-foreground">Run your prompt against a suite of test cases and review results.</p>
       </div>
       {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
-      <div className="mb-4 flex items-center space-x-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Test Sets</label>
-          <select
-            className="border rounded px-2 py-1"
-            value={selectedTestSetId ?? ''}
-            onChange={e => setSelectedTestSetId(Number(e.target.value))}
-          >
+      <div className="mb-4 w-full max-w-xs">
+        <Select value={selectedTestSetId ? String(selectedTestSetId) : ''} onValueChange={val => setSelectedTestSetId(Number(val))}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select test set" />
+          </SelectTrigger>
+          <SelectContent>
+            <div className="px-2 py-2 border-b border-muted mb-2">
+              <form className="flex space-x-2" onSubmit={e => { e.preventDefault(); handleCreateTestSet(); }}>
+                <Input
+                  placeholder="New test set name"
+                  value={testSetName}
+                  onChange={e => setTestSetName(e.target.value)}
+                  className="h-8"
+                />
+                <Button type="submit" size="sm" disabled={!testSetName.trim()}>Add</Button>
+              </form>
+            </div>
             {testSets.map(ts => (
-              <option key={ts.id} value={ts.id}>{ts.name}</option>
+              <div key={ts.id} className="flex items-center justify-between px-2 py-1 group hover:bg-accent rounded cursor-pointer">
+                <SelectItem value={String(ts.id)} className="flex-1 cursor-pointer">
+                  {ts.name}
+                </SelectItem>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-60 group-hover:opacity-100 ml-2"
+                  onClick={e => { e.stopPropagation(); handleDeleteTestSet(ts.id); }}
+                  tabIndex={-1}
+                >
+                  <Trash className="w-4 h-4 text-destructive" />
+                </Button>
+              </div>
             ))}
-          </select>
-        </div>
-        <div className="flex items-center space-x-2">
-          <input
-            className="border rounded px-2 py-1"
-            placeholder="New test set name"
-            value={testSetName}
-            onChange={e => setTestSetName(e.target.value)}
-          />
-          <Button onClick={handleCreateTestSet}>Create</Button>
-        </div>
-        {selectedTestSetId && (
-          <Button variant="destructive" onClick={() => handleDeleteTestSet(selectedTestSetId)}>Delete Selected</Button>
-        )}
+          </SelectContent>
+        </Select>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Test Data Panel */}
