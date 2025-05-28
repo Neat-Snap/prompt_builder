@@ -5,7 +5,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from datetime import datetime, timedelta
 from app.db.session import get_db_session
-from app.db.models import User, Project, Prompt, PromptVersion, Run
+from app.db.models import User, Project, Prompt, PromptVersion, Run, TestSet
 import loguru
 import traceback
 from app.utils.auth import hash_password
@@ -335,16 +335,16 @@ def set_prompt_version(prompt_data: dict) -> bool:
         logger.error(f"Error setting prompt: {traceback.format_exc()}")
         return False
 
-def set_prompts(prompts_data: List[dict]) -> bool:
-    try:
-        with get_db_session() as db:
-            for prompt_data in prompts_data:
-                set_prompt(prompt_data)
-            db.commit()
-            return True
-    except Exception as e:
-        logger.error(f"Error setting prompts: {traceback.format_exc()}")
-        return False
+# def set_prompts(prompts_data: List[dict]) -> bool:
+#     try:
+#         with get_db_session() as db:
+#             for prompt_data in prompts_data:
+#                 set_prompt(prompt_data)
+#             db.commit()
+#             return True
+#     except Exception as e:
+#         logger.error(f"Error setting prompts: {traceback.format_exc()}")
+#         return False
 
 def delete_prompt(prompt_id: int) -> bool:
     try:
@@ -523,3 +523,52 @@ def delete_run(run_id: int) -> bool:
         return False
 
 
+def get_project_testsets(project_id: int) -> List[dict]:
+    try:
+        with get_db_session() as db:
+            testsets = db.query(TestSet).filter(TestSet.project_id == project_id).all()
+            return [testset.to_dict() for testset in testsets]
+    except Exception as e:
+        logger.error(f"Error getting project tests: {traceback.format_exc()}")
+        return []
+
+
+def get_tests_from_testset(testset_id: int) -> List[dict]:
+    try:
+        with get_db_session() as db:
+            testset = db.query(TestSet).filter(TestSet.id == testset_id).first()
+            if not testset:
+                return []
+            return testset.tests
+    except Exception as e:
+        logger.error(f"Error getting tests from testset: {traceback.format_exc()}")
+        return []
+    
+def create_testset(testset_data: dict) -> bool:
+    try:
+        with get_db_session() as db:
+            testset = TestSet(**testset_data)
+            db.add(testset)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error creating testset: {traceback.format_exc()}")
+        return False
+    
+def add_test_to_testset(testset_id: int, test_data) -> bool:
+    """
+    Creates a new test inside existing testset
+    """
+    try:
+        with get_db_session() as db:
+            testset = db.query(TestSet).filter(TestSet.id == testset_id).first()
+            if not testset:
+                return False
+            testset.tests.append(test_data)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error adding test to testset: {traceback.format_exc()}")
+        return False
+    
+    

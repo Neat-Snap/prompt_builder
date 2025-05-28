@@ -24,6 +24,7 @@ class User(Base):
     keys = Column(JSON, nullable=True)
 
     projects = relationship("Project", back_populates="user")
+    tests = relationship("Test", back_populates="user")
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -41,6 +42,7 @@ class Project(Base):
     user = relationship("User", back_populates="projects")
 
     prompts = relationship("Prompt", back_populates="project")
+    tests = relationship("Test", back_populates="project")
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -107,6 +109,21 @@ class Run(Base):
 
     user = relationship("User")
     prompt = relationship("Prompt", back_populates="runs")
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class TestSet(Base):
+    __tablename__ = "testsets"
+    id = Column(BigInteger, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    project_id = Column(BigInteger, ForeignKey("projects.id"))
+    project = relationship("Project", back_populates="tests")
+
+    tests = relationship("Test", back_populates="testset")
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
