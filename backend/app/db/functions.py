@@ -9,6 +9,8 @@ from app.db.models import User, Project, Prompt, PromptVersion, Run, TestSet
 import loguru
 import traceback
 from app.utils.auth import hash_password
+from sqlalchemy.orm.attributes import flag_modified
+
 
 logger = loguru.logger
 
@@ -122,6 +124,7 @@ def set_users(users_data: List[dict]) -> bool:
 
 def get_user_by_email(email: str) -> dict:
     try:
+        logger.debug(f"Getting user by email: {email}")
         with get_db_session() as db:
             user = db.query(User).filter(User.email == email).first()
             if not user:
@@ -527,7 +530,9 @@ def get_project_testsets(project_id: int) -> List[dict]:
     try:
         with get_db_session() as db:
             testsets = db.query(TestSet).filter(TestSet.project_id == project_id).all()
-            return [testset.to_dict() for testset in testsets]
+            result = [testset.to_dict() for testset in testsets]
+            logger.debug(f"Testsets: {result}")
+            return result
     except Exception as e:
         logger.error(f"Error getting project tests: {traceback.format_exc()}")
         return []
@@ -555,7 +560,7 @@ def create_testset(testset_data: dict) -> bool:
         logger.error(f"Error creating testset: {traceback.format_exc()}")
         return False
     
-def add_test_to_testset(testset_id: int, test_data) -> bool:
+def add_test_to_testset(testset_id: int, test_prompt) -> bool:
     """
     Creates a new test inside existing testset
     """
@@ -564,11 +569,42 @@ def add_test_to_testset(testset_id: int, test_data) -> bool:
             testset = db.query(TestSet).filter(TestSet.id == testset_id).first()
             if not testset:
                 return False
-            testset.tests.append(test_data)
+            if testset.tests is None:
+                testset.tests = []
+            logger.debug(f"Testset tests before adding new one {testset.tests}")
+            testset.tests.append({"prompt": test_prompt, "id": len(testset.tests)})
+            flag_modified(testset, "tests")
             db.commit()
+            logger.debug(f"Testset after adding test: {testset.to_dict()}")
             return True
     except Exception as e:
         logger.error(f"Error adding test to testset: {traceback.format_exc()}")
         return False
     
-    
+
+def delete_test_from_testset(testset_id: int, test_id: int) -> bool:
+    try:
+        with get_db_session() as db:
+            testset = db.query(TestSet).filter(TestSet.id == testset_id).first()
+            if not testset:
+                return False
+            testset.tests = [i for i in testset.tests if i["id"] != test_id]
+            flag_modified(testset, "tests")
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting test from testset: {traceback.format_exc()}")
+        return False
+
+def delete_testset(testset_id: int) -> bool:
+    try:
+        with get_db_session() as db:
+            testset = db.query(TestSet).filter(TestSet.id == testset_id).first()
+            if not testset:
+                return False
+            db.delete(testset)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting testset: {traceback.format_exc()}")
+        return False

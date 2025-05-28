@@ -69,4 +69,17 @@ export const llmApi = {
   searchModels: (q: string) => api.get(`/llm/search?q=${encodeURIComponent(q)}`),
 };
 
+export const testsetsApi = {
+  // Get all testsets for a project
+  list: (projectId: string | number) => api.get(`/tests/testsets/${projectId}`),
+  // Create a new testset for a project
+  create: (projectId: string | number, data: { name: string }) => api.post(`/tests/testsets/${projectId}`, data),
+  // Add a test to a testset
+  addTest: (testsetId: string | number, prompt: string) => api.post(`/tests/testsets/${testsetId}/tests`, { prompt }),
+  // Delete a test from a testset
+  deleteTest: (testsetId: string | number, testId: string | number) => api.delete(`/tests/testsets/${testsetId}/tests/${testId}`),
+  // Delete a testset
+  deleteTestset: (testsetId: string | number) => api.delete(`/tests/testsets/${testsetId}`),
+};
+
 export default api;

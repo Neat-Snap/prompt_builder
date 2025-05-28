@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Play, RefreshCw, Copy, Upload } from 'lucide-react';
-import { promptsApi } from '@/lib/api';
+import { promptsApi, testsetsApi } from '@/lib/api';
+import type { TestSet, TestSetTest } from '@/types';
 
 interface PromptTestSuiteProps {
   projectId: string;
@@ -35,7 +36,6 @@ interface TestResult {
 }
 
 export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
-  const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [newInput, setNewInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>('gpt-4');
   const [isRunning, setIsRunning] = useState(false);
@@ -46,6 +46,9 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [testSets, setTestSets] = useState<TestSet[]>([]);
+  const [selectedTestSetId, setSelectedTestSetId] = useState<number | null>(null);
+  const [testSetName, setTestSetName] = useState('');
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -75,6 +78,24 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
     fetchPrompts();
   }, [projectId, promptId]);
 
+  useEffect(() => {
+    async function fetchTestSets() {
+      try {
+        const res = await testsetsApi.list(projectId);
+        setTestSets(res.data || []);
+        if (res.data && res.data.length > 0 && selectedTestSetId === null) {
+          setSelectedTestSetId(res.data[0].id);
+        }
+      } catch (e) {
+        setError('Failed to load test sets.');
+      }
+    }
+    fetchTestSets();
+  }, [projectId]);
+
+  const selectedTestSet = testSets.find(ts => ts.id === selectedTestSetId) || null;
+  const testCases = selectedTestSet?.tests || [];
+
   const handleSelectPrompt = async (id: string) => {
     setSelectedPromptId(id);
     setPrompt('');
@@ -94,23 +115,30 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
     }
   };
 
-  const addTestCase = () => {
-    if (!newInput.trim()) return;
-    setTestCases(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), input: newInput }]);
-    setNewInput('');
+  const addTestCase = async () => {
+    if (!newInput.trim() || !selectedTestSetId) return;
+    try {
+      await testsetsApi.addTest(selectedTestSetId, newInput);
+      setNewInput('');
+      const res = await testsetsApi.list(projectId);
+      setTestSets(res.data || []);
+    } catch (e) {
+      setError('Failed to add test.');
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !selectedTestSetId) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const text = event.target?.result as string;
       const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-      setTestCases(prev => [
-        ...prev,
-        ...lines.map(input => ({ id: Math.random().toString(36).substr(2, 9), input }))
-      ]);
+      for (const input of lines) {
+        await testsetsApi.addTest(selectedTestSetId, input);
+      }
+      const res = await testsetsApi.list(projectId);
+      setTestSets(res.data || []);
     };
     reader.readAsText(file);
   };
@@ -137,6 +165,42 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
     setTimeout(() => setIsRunning(false), 2000);
   };
 
+  const handleCreateTestSet = async () => {
+    if (!testSetName.trim()) return;
+    try {
+      await testsetsApi.create(projectId, { name: testSetName });
+      setTestSetName('');
+      const res = await testsetsApi.list(projectId);
+      setTestSets(res.data || []);
+    } catch (e) {
+      setError('Failed to create test set.');
+    }
+  };
+
+  const handleDeleteTestSet = async (testSetId: number) => {
+    try {
+      await testsetsApi.deleteTestset(testSetId);
+      const res = await testsetsApi.list(projectId);
+      setTestSets(res.data || []);
+      if (selectedTestSetId === testSetId) {
+        setSelectedTestSetId(res.data?.[0]?.id || null);
+      }
+    } catch (e) {
+      setError('Failed to delete test set.');
+    }
+  };
+
+  const handleDeleteTest = async (testId: number) => {
+    if (!selectedTestSetId) return;
+    try {
+      await testsetsApi.deleteTest(selectedTestSetId, testId);
+      const res = await testsetsApi.list(projectId);
+      setTestSets(res.data || []);
+    } catch (e) {
+      setError('Failed to delete test.');
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -144,6 +208,32 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
         <p className="text-muted-foreground">Run your prompt against a suite of test cases and review results.</p>
       </div>
       {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
+      <div className="mb-4 flex items-center space-x-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Test Sets</label>
+          <select
+            className="border rounded px-2 py-1"
+            value={selectedTestSetId ?? ''}
+            onChange={e => setSelectedTestSetId(Number(e.target.value))}
+          >
+            {testSets.map(ts => (
+              <option key={ts.id} value={ts.id}>{ts.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center space-x-2">
+          <input
+            className="border rounded px-2 py-1"
+            placeholder="New test set name"
+            value={testSetName}
+            onChange={e => setTestSetName(e.target.value)}
+          />
+          <Button onClick={handleCreateTestSet}>Create</Button>
+        </div>
+        {selectedTestSetId && (
+          <Button variant="destructive" onClick={() => handleDeleteTestSet(selectedTestSetId)}>Delete Selected</Button>
+        )}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Test Data Panel */}
         <Card>
@@ -157,11 +247,12 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
                 value={newInput}
                 onChange={e => setNewInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addTestCase(); }}
+                disabled={!selectedTestSetId}
               />
-              <Button onClick={addTestCase}>Add</Button>
+              <Button onClick={addTestCase} disabled={!selectedTestSetId}>Add</Button>
               <label className="inline-flex items-center cursor-pointer">
                 <Upload className="w-4 h-4 mr-1" />
-                <input type="file" accept=".txt" className="hidden" onChange={handleFileUpload} />
+                <input type="file" accept=".txt" className="hidden" onChange={handleFileUpload} disabled={!selectedTestSetId} />
                 <span className="text-xs">Upload</span>
               </label>
             </div>
@@ -170,16 +261,20 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
                 <thead>
                   <tr className="bg-muted">
                     <th className="p-2 text-left">Input</th>
+                    <th className="p-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {testCases.map(tc => (
                     <tr key={tc.id}>
-                      <td className="p-2 border-b">{tc.input}</td>
+                      <td className="p-2 border-b">{tc.prompt ?? tc.input}</td>
+                      <td className="p-2 border-b">
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteTest(Number(tc.id))}>Delete</Button>
+                      </td>
                     </tr>
                   ))}
                   {testCases.length === 0 && (
-                    <tr><td className="p-2 text-muted-foreground">No test cases yet.</td></tr>
+                    <tr><td className="p-2 text-muted-foreground" colSpan={2}>No test cases yet.</td></tr>
                   )}
                 </tbody>
               </table>

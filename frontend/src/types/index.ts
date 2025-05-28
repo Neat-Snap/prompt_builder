@@ -67,3 +67,16 @@ export interface Tab {
   projectId?: string;
   isClosable: boolean;
 }
+
+export interface TestSetTest {
+  id: number;
+  prompt: string;
+}
+
+export interface TestSet {
+  id: number;
+  name: string;
+  createdAt: string;
+  tests: TestSetTest[];
+  projectId: number;
+}
