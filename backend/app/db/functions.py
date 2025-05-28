@@ -613,10 +613,10 @@ def delete_testset(testset_id: int) -> bool:
 
 # ------ Run functions ------
 
-def create_run(model, prompt_version_id, user_id, prompt_id, number_of_tests):
+def create_run(model, prompt_version_id, email, prompt_id, number_of_tests):
     try:
         with get_db_session() as db:
-            run = Run(model=model, prompt_version_id=prompt_version_id, user_id=user_id, prompt_id=prompt_id, number_of_tests=number_of_tests)
+            run = Run(model=model, prompt_version_id=prompt_version_id, email=email, prompt_id=prompt_id, number_of_tests=number_of_tests)
             db.add(run)
             db.commit()
             return run.to_dict()
@@ -625,9 +625,10 @@ def create_run(model, prompt_version_id, user_id, prompt_id, number_of_tests):
         return False
 
 
-def update_run(run_id, *run_data):
+def update_run(run_id, **run_data):
     try:
         with get_db_session() as db:
+            logger.debug(f"Updating run info for run {run_id} with data {run_data}")
             run = db.query(Run).filter(Run.id == run_id).first()
             if not run:
                 return False
@@ -647,13 +648,17 @@ def update_run_result(run_id, new_result_object):
             run = db.query(Run).filter(Run.id == run_id).first()
             if not run:
                 return False
+            logger.debug(f"Run result before update: {run.result}")
             result = run.result
             result[len(result)] = new_result_object
             run.result = result
-
+            logger.debug(f"Run result after update: {run.result}")
             run.current_test += 1
-
+            logger.debug(f"Run current test after update: {run.current_test}")
+            flag_modified(run, "current_test")
+            flag_modified(run, "result")
             db.commit()
+            logger.debug(f"Run result updated: {run.to_dict()}")
             return True
     except Exception as e:
         logger.error(f"Error updating run result: {traceback.format_exc()}")

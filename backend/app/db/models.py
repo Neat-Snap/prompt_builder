@@ -114,7 +114,7 @@ class Run(Base):
 
     cost = Column(Float, nullable=True)
     success = Column(Boolean, nullable=True)
-    result = Column(JSON, default={})
+    result = Column(JSON, default=dict)
 
     prompt_id = Column(BigInteger, ForeignKey("prompts.id"))
     prompt = relationship("Prompt", back_populates="runs")

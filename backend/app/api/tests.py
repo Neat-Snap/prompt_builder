@@ -6,7 +6,7 @@ import loguru
 from openai import OpenAI
 import requests
 from app.utils.agents import get_agent
-from utils.openrouter import make_llm_request
+from app.utils.openrouter import make_llm_request
 import threading
 
 
@@ -28,23 +28,31 @@ def run_testset(email, testset_data, prompt_id, model, version_id=-1):
             else:
                 raise HTTPException(status_code=404, detail="Version not found")
     else:
+        version_id = versions[0]["id"]
         system_prompt = versions[0]["prompt_text"]
 
-    user_api_key = get_user_keys(email)
+    user_api_key = get_user_keys(email)["openrouter"]
+
+    logger.debug(f"Running testset {testset_data['id']} for prompt {prompt_id} with model {model}")
 
     number_of_tests = len(testset_data["tests"])
 
     run = create_run(model, version_id, email, prompt_id, number_of_tests=number_of_tests)
 
+    logger.debug(f"Created run {run['id']}")
+
+    update_run(run["id"], status="In Progress")
     test_number = 0
     for test in testset_data["tests"]:
         test_user_prompt = test["prompt"]
 
+        logger.debug(f"Running test {test_number} of {number_of_tests} with key {user_api_key}")
+
         result = make_llm_request(user_api_key, system_prompt, test_user_prompt, model)
 
+        logger.debug(f"Result: {result}")
+
         update_run_result(run["id"], result)
-        test_number += 1
-        update_run(run["id"], status="In Progress", current_test=test_number)
     
     update_run(run["id"], status="Finished")
 
@@ -115,8 +123,11 @@ async def run_testset_endpoint(request: Request, project_id: int):
     if not needed_testset:
         raise HTTPException(status_code=404, detail="Testset not found")
     
+    logger.debug(f"Running testset {testset_id} for prompt {prompt_id} with model {model}")
+    
     thread = threading.Thread(target=run_testset, args=(email, needed_testset, prompt_id, model))
     thread.start()
+    logger.debug(f"Started thread for testset {testset_id}")
     return {"success": True, "message": "Testset run successfully"}
 
 

@@ -3,7 +3,7 @@ from app.db.functions import *
 from app.db.models import User
 from app.settings import settings
 import loguru
-from utils.openrouter import *
+from app.utils.openrouter import *
 
 
 

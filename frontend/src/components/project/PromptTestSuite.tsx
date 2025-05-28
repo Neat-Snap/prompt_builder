@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,8 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Play, RefreshCw, Copy, Upload, Trash } from 'lucide-react';
-import { promptsApi, testsetsApi } from '@/lib/api';
+import { Play, RefreshCw, Copy, Upload, Trash, Check, X as XIcon } from 'lucide-react';
+import { promptsApi, testsetsApi, llmApi } from '@/lib/api';
 import type { TestSet, TestSetTest } from '@/types';
 
 interface PromptTestSuiteProps {
@@ -49,6 +49,15 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
   const [testSets, setTestSets] = useState<TestSet[]>([]);
   const [selectedTestSetId, setSelectedTestSetId] = useState<number | null>(null);
   const [testSetName, setTestSetName] = useState('');
+  const [modelSearch, setModelSearch] = useState('');
+  const [modelResults, setModelResults] = useState<any[]>([]);
+  const [modelSearchLoading, setModelSearchLoading] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [selectedModelObj, setSelectedModelObj] = useState<any>(null);
+  const modelSearchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [runStatus, setRunStatus] = useState<any>(null);
+  const [polling, setPolling] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -143,26 +152,74 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
     reader.readAsText(file);
   };
 
+  // Model search effect
+  useEffect(() => {
+    if (!modelSearch) {
+      setModelResults([]);
+      return;
+    }
+    setModelSearchLoading(true);
+    if (modelSearchTimeout.current) clearTimeout(modelSearchTimeout.current);
+    modelSearchTimeout.current = setTimeout(async () => {
+      try {
+        const res = await llmApi.searchModels(modelSearch);
+        setModelResults(res.data.models);
+      } catch {
+        setModelResults([]);
+      } finally {
+        setModelSearchLoading(false);
+      }
+    }, 400);
+    // eslint-disable-next-line
+  }, [modelSearch]);
+
+  // Polling for run status
+  const pollRunStatus = (promptVersionId: string | number) => {
+    setPolling(true);
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await testsetsApi.checkRun(promptVersionId);
+        setRunStatus(res.data);
+        if (res.data.status === 'Finished' || res.data.status === 'Error') {
+          setPolling(false);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+        }
+      } catch (e) {
+        // Optionally handle error
+      }
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  // Run testset
   const runSuite = async () => {
+    if (!selectedTestSetId || !selectedModelObj || !selectedPromptId) return;
     setIsRunning(true);
     setResults([]);
-    const usedPrompt = selectedPromptId === 'custom' ? customPrompt : prompt;
-    // Simulate running tests
-    for (const testCase of testCases) {
-      setTimeout(() => {
-        setResults(prev => [
-          ...prev,
-          {
-            id: testCase.id,
-            input: testCase.input,
-            model: selectedModel,
-            response: `Mock response for: ${testCase.input} (Prompt: ${usedPrompt.slice(0, 30)}...)`,
-            status: 'success',
-          },
-        ]);
-      }, Math.random() * 1000 + 500);
+    setRunStatus(null);
+    setError(null);
+    try {
+      // Get latest prompt version id
+      const promptRes = await promptsApi.get(projectId, selectedPromptId);
+      const versions = promptRes.data.versions || [];
+      const latest = versions[versions.length - 1];
+      const promptVersionId = latest?.id;
+      await testsetsApi.run(projectId, {
+        testset_id: selectedTestSetId,
+        prompt_id: selectedPromptId,
+        model: selectedModelObj.slug,
+      });
+      pollRunStatus(promptVersionId);
+    } catch (e) {
+      setError('Failed to start test run.');
+      setIsRunning(false);
     }
-    setTimeout(() => setIsRunning(false), 2000);
   };
 
   const handleCreateTestSet = async () => {
@@ -338,24 +395,80 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
               <CardTitle>Model & Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableModels.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name} <span className="text-xs text-muted-foreground ml-2">({model.provider})</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button 
-                onClick={runSuite} 
-                disabled={testCases.length === 0 || isRunning || (selectedPromptId === 'custom' && !customPrompt) || (selectedPromptId !== 'custom' && !prompt)}
+              <div className="relative">
+                <input
+                  type="text"
+                  className={`w-full border rounded px-3 py-2 text-sm pr-10 ${selectedModelObj ? 'bg-green-50 cursor-pointer' : ''}`}
+                  placeholder="Search models..."
+                  value={selectedModelObj ? selectedModelObj.name : modelSearch}
+                  onChange={e => {
+                    if (!selectedModelObj) {
+                      setModelSearch(e.target.value);
+                      setModelDropdownOpen(true);
+                    }
+                  }}
+                  onFocus={e => {
+                    if (selectedModelObj) {
+                      setSelectedModelObj(null);
+                      setModelSearch('');
+                      setModelDropdownOpen(true);
+                      setTimeout(() => e.target.select(), 0);
+                    } else {
+                      setModelDropdownOpen(true);
+                    }
+                  }}
+                  readOnly={!!selectedModelObj}
+                />
+                {selectedModelObj ? (
+                  <>
+                    <Check className="absolute right-8 top-1/2 -translate-y-1/2 text-green-600 w-5 h-5" />
+                    <button
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      onClick={() => {
+                        setSelectedModelObj(null);
+                        setModelSearch('');
+                        setModelDropdownOpen(true);
+                      }}
+                      tabIndex={-1}
+                      type="button"
+                    >
+                      <XIcon className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : null}
+                {modelDropdownOpen && modelSearch && !selectedModelObj && (
+                  <div className="absolute z-10 bg-white border rounded shadow w-full mt-1 max-h-60 overflow-auto">
+                    {modelSearchLoading ? (
+                      <div className="p-2 text-sm text-muted-foreground">Searching...</div>
+                    ) : modelResults.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">No models found.</div>
+                    ) : (
+                      modelResults.map((model) => (
+                        <div
+                          key={model.slug}
+                          className={`px-3 py-2 cursor-pointer hover:bg-accent flex items-center justify-between ${selectedModelObj && selectedModelObj.slug === model.slug ? 'bg-accent' : ''}`}
+                          onClick={() => {
+                            setSelectedModelObj(model);
+                            setModelDropdownOpen(false);
+                          }}
+                        >
+                          <div>
+                            <div className="font-medium">{model.name}</div>
+                            <div className="text-xs text-muted-foreground">{model.author}</div>
+                          </div>
+                          {model.is_free && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Free</span>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                onClick={runSuite}
+                disabled={testCases.length === 0 || isRunning || !selectedModelObj || (selectedPromptId === 'custom' && !customPrompt) || (selectedPromptId !== 'custom' && !prompt)}
                 className="w-full"
               >
-                {isRunning ? (
+                {isRunning || polling ? (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                     Running...
@@ -375,23 +488,63 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
               <CardTitle>Results</CardTitle>
             </CardHeader>
             <CardContent>
-              {results.length === 0 ? (
-                <div className="text-muted-foreground">Run the test suite to see results here.</div>
-              ) : (
+              {runStatus ? (
                 <div className="space-y-2">
-                  {results.map(result => (
-                    <div key={result.id} className="border rounded p-2 flex flex-col">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{result.input}</span>
-                        <Badge variant={result.status === 'success' ? 'default' : 'destructive'}>{result.status}</Badge>
+                  <div className="flex justify-between">
+                    <span>Status:</span>
+                    <span>{runStatus.status}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Progress:</span>
+                    <span>{runStatus.current_test}/{runStatus.number_of_tests}</span>
+                  </div>
+                  {runStatus.status === 'Finished' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Total Cost:</span>
+                        <span>${runStatus.cost?.toFixed(4) ?? 'N/A'}</span>
                       </div>
-                      <div className="bg-muted p-2 rounded text-xs mb-1">{result.response}</div>
-                      <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(result.response)}>
-                        <Copy className="w-4 h-4" /> Copy
-                      </Button>
-                    </div>
-                  ))}
+                      <div className="flex justify-between">
+                        <span>Success:</span>
+                        <span>{runStatus.success ? 'Yes' : 'No'}</span>
+                      </div>
+                      {/* Detailed results table */}
+                      <div className="mt-4">
+                        <div className="font-semibold mb-2">Test Case Results</div>
+                        <div className="overflow-auto max-h-64 border rounded">
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="bg-muted">
+                                <th className="p-2 text-left">#</th>
+                                <th className="p-2 text-left">Input</th>
+                                <th className="p-2 text-left">Model Response</th>
+                                <th className="p-2 text-left">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {testCases.map((tc, idx) => (
+                                <tr key={tc.id}>
+                                  <td className="p-2 border-b align-top">{idx + 1}</td>
+                                  <td className="p-2 border-b align-top">{tc.prompt ?? tc.input}</td>
+                                  <td className="p-2 border-b align-top whitespace-pre-line">{runStatus.result && runStatus.result[idx] ? runStatus.result[idx] : <span className="text-muted-foreground">No response</span>}</td>
+                                  <td className="p-2 border-b align-top">
+                                    {runStatus.result && runStatus.result[idx] && (
+                                      <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(runStatus.result[idx])}>
+                                        <Copy className="w-4 h-4" /> Copy
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
+              ) : (
+                <div className="text-muted-foreground">Run the test suite to see results here.</div>
               )}
             </CardContent>
           </Card>

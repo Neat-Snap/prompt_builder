@@ -80,6 +80,10 @@ export const testsetsApi = {
   deleteTest: (testsetId: string | number, testId: string | number) => api.delete(`/tests/testsets/${testsetId}/tests/${testId}`),
   // Delete a testset
   deleteTestset: (testsetId: string | number) => api.delete(`/tests/testsets/${testsetId}`),
+  // Run a testset
+  run: (projectId: string | number, data: { testset_id: number, prompt_id: string, model: string }) => api.post(`/tests/run_testset/${projectId}`, data),
+  // Check run status
+  checkRun: (promptVersionId: string | number) => api.get(`/tests/check_run/${promptVersionId}`),
 };
 
 export default api;
