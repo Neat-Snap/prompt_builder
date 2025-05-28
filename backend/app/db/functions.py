@@ -608,3 +608,62 @@ def delete_testset(testset_id: int) -> bool:
     except Exception as e:
         logger.error(f"Error deleting testset: {traceback.format_exc()}")
         return False
+
+
+
+# ------ Run functions ------
+
+def create_run(model, prompt_version_id, user_id, prompt_id, number_of_tests):
+    try:
+        with get_db_session() as db:
+            run = Run(model=model, prompt_version_id=prompt_version_id, user_id=user_id, prompt_id=prompt_id, number_of_tests=number_of_tests)
+            db.add(run)
+            db.commit()
+            return run.to_dict()
+    except Exception as e:
+        logger.error(f"Error creating run: {traceback.format_exc()}")
+        return False
+
+
+def update_run(run_id, *run_data):
+    try:
+        with get_db_session() as db:
+            run = db.query(Run).filter(Run.id == run_id).first()
+            if not run:
+                return False
+            for key, value in run_data.items():
+                if hasattr(run, key):
+                    setattr(run, key, value)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error updating run: {traceback.format_exc()}")
+        return False
+
+
+def update_run_result(run_id, new_result_object):
+    try:
+        with get_db_session() as db:
+            run = db.query(Run).filter(Run.id == run_id).first()
+            if not run:
+                return False
+            result = run.result
+            result[len(result)] = new_result_object
+            run.result = result
+
+            run.current_test += 1
+
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error updating run result: {traceback.format_exc()}")
+        return False
+
+
+def check_run(prompt_version_id: int) -> dict:
+    try:
+        with get_db_session() as db:
+            run = db.query(Run).filter(Run.prompt_version_id == prompt_version_id).first()
+            return run.to_dict()
+    except Exception as e:
+        logger.error(f"Error checking run: {traceback.format_exc()}")

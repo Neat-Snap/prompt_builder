@@ -96,18 +96,29 @@ class PromptVersion(Base):
 class Run(Base):
     __tablename__ = "runs"
     id = Column(BigInteger, primary_key=True, index=True)
+
+    model = Column(String, nullable=False)
     prompt_version_id = Column(BigInteger, ForeignKey("prompt_versions.id"))
     prompt_version = relationship("PromptVersion", back_populates="runs")
-    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+
+    email = Column(String, ForeignKey("users.email"), nullable=True)
+    user = relationship("User")
+
     started_at = Column(DateTime, default=func.now())
     finished_at = Column(DateTime, nullable=True)
+
+    number_of_tests = Column(Integer, nullable=False)
+    current_test = Column(Integer, default=0)
+
+    status = Column(String, default="Pending")
+
     cost = Column(Float, nullable=True)
     success = Column(Boolean, nullable=True)
-    result = Column(Text, nullable=True)
-    prompt_id = Column(BigInteger, ForeignKey("prompts.id"))
+    result = Column(JSON, default={})
 
-    user = relationship("User")
+    prompt_id = Column(BigInteger, ForeignKey("prompts.id"))
     prompt = relationship("Prompt", back_populates="runs")
+    
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
