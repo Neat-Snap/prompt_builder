@@ -29,6 +29,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { NewPromptDialog } from './NewPromptDialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface PromptsConstructorProps {
   projectId: string;
@@ -74,6 +82,10 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
   const lastSavedPrompt = useRef<string>('');
   const didUnmount = useRef(false);
 
+  const [prompts, setPrompts] = useState<{ id: string; name: string }[]>([]);
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(promptId ?? null);
+  const [newPromptDialogOpen, setNewPromptDialogOpen] = useState(false);
+
   const resetForm = () => {
     setPromptBuilder({
       name: '',
@@ -91,12 +103,10 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
         .then(res => {
           const blocks: PromptBlock[] = [];
           
-          // Get the latest version's prompt text
           const versions = res.data.versions || [];
           const latestVersion = versions[versions.length - 1];
           
           if (latestVersion?.prompt_text) {
-            // Parse the prompt text to extract blocks
             const tagRegex = /<([^>]+)>\n([\s\S]*?)\n<\/\1>/g;
             let match;
             
@@ -133,7 +143,6 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
     }
   }, [promptId, projectId]);
 
-  // Autosave effect for generatedPrompt
   useEffect(() => {
     if (!promptId) return;
     if (!promptLoaded) return;
@@ -152,15 +161,12 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
         });
         lastSavedPrompt.current = generatedPrompt;
       } catch (e) {
-        // Optionally handle error
       } finally {
         setLoading(false);
       }
     }, 800);
-    // eslint-disable-next-line
   }, [generatedPrompt, promptId, promptLoaded]);
 
-  // Save immediately when switching prompts
   useEffect(() => {
     didUnmount.current = false;
     return () => {
@@ -169,7 +175,6 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
       if (!promptLoaded) return;
       if (promptId && generatedPrompt !== lastSavedPrompt.current) {
         if (!generatedPrompt && lastSavedPrompt.current) return;
-        // Prevent save if unmounting due to reset
         if (didUnmount.current) return;
         setLoading(true);
         promptsApi.get(projectId, promptId).then(promptRes => {
@@ -183,7 +188,6 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
         lastSavedPrompt.current = generatedPrompt;
       }
     };
-    // eslint-disable-next-line
   }, [promptId, promptLoaded]);
 
   const updateGeneratedPrompt = (blocks: PromptBlock[]) => {
@@ -295,6 +299,25 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
     return PREDEFINED_BLOCK_TYPES[block.type as keyof typeof PREDEFINED_BLOCK_TYPES] || block.type;
   };
 
+  useEffect(() => {
+    async function fetchPrompts() {
+      try {
+        const res = await promptsApi.list(projectId);
+        setPrompts(res.data);
+        if (!selectedPromptId && res.data.length > 0) {
+          setSelectedPromptId(res.data[0].id);
+        }
+      } catch {
+      }
+    }
+    fetchPrompts();
+  }, [projectId, newPromptDialogOpen]);
+
+  useEffect(() => {
+    if (selectedPromptId && selectedPromptId !== promptId) {
+    }
+  }, [selectedPromptId]);
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -304,8 +327,44 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
         </p>
       </div>
 
+      <div className="mb-6 flex items-center space-x-4">
+        <div className="w-72">
+          <Label htmlFor="prompt-selector">Prompt</Label>
+          <Select
+            value={selectedPromptId ?? ''}
+            onValueChange={val => {
+              if (val === '__new__') {
+                setNewPromptDialogOpen(true);
+              } else {
+                setSelectedPromptId(val);
+              }
+            }}
+          >
+            <SelectTrigger id="prompt-selector" className="w-full">
+              <SelectValue placeholder="Select or create a prompt" />
+            </SelectTrigger>
+            <SelectContent>
+              {prompts.map((prompt) => (
+                <SelectItem key={prompt.id} value={prompt.id}>
+                  {prompt.name}
+                </SelectItem>
+              ))}
+              <SelectItem value="__new__" className="text-primary font-semibold">+ Create New Prompt</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <NewPromptDialog
+        open={newPromptDialogOpen}
+        onOpenChange={setNewPromptDialogOpen}
+        projectId={projectId}
+        onPromptCreated={() => {
+          setNewPromptDialogOpen(false);
+        }}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Builder Form */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -355,16 +414,6 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 relative">
-            <div>
-              <Label htmlFor="prompt-name">Prompt Name</Label>
-              <Input
-                id="prompt-name"
-                placeholder="e.g., Customer Support Response Generator"
-                value={promptBuilder.name}
-                onChange={(e) => setPromptBuilder(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-
             <DragDropContext onDragEnd={onDragEnd}>
               <Droppable droppableId="prompt-blocks">
                 {(provided: DroppableProvided) => (
@@ -434,15 +483,9 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
             {success && (
               <div className="text-sm text-green-500">{success}</div>
             )}
-            {/* {loading && (
-              <div className="absolute bottom-3 right-6 text-xs text-muted-foreground pointer-events-none select-none">
-                Saving...
-              </div>
-            )} */}
           </CardContent>
         </Card>
 
-        {/* Preview */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">

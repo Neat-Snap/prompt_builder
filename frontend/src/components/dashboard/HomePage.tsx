@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
 
 export function HomePage() {
-  const { user, projects, addTab } = useAppStore();
+  const { user, projects, openProject } = useAppStore();
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [openrouterKey, setOpenrouterKey] = useState('');
@@ -50,20 +50,13 @@ export function HomePage() {
     }
   };
 
-  const openProject = (project: Project) => {
-    addTab({
-      id: `project-${project.id}`,
-      type: 'project',
-      title: project.name,
-      projectId: project.id,
-      isClosable: true,
-    });
+  const openProjectHandler = (project: Project) => {
+    openProject(project.id);
   };
 
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Header Section */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back!</h1>
@@ -116,7 +109,6 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -171,7 +163,6 @@ export function HomePage() {
           </Card>
         </div>
 
-        {/* Projects Grid */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Your Projects</h2>
@@ -186,7 +177,7 @@ export function HomePage() {
               <Card
                 key={project.id}
                 className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => openProject(project)}
+                onClick={() => openProjectHandler(project)}
               >
                 <CardHeader>
                   <div className="flex items-center justify-between">

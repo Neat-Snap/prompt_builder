@@ -9,7 +9,8 @@ import {
   Play, 
   GitBranch,
   Menu,
-  X
+  X,
+  Home
 } from 'lucide-react';
 import { ProjectDashboard } from './ProjectDashboard';
 import { PromptsConstructor } from './PromptsConstructor';
@@ -21,6 +22,7 @@ import { NewPromptDialog } from './NewPromptDialog';
 import { PromptPlayground } from './PromptPlayground';
 import { PromptTestSuite } from './PromptTestSuite';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useAppStore } from '@/lib/store';
 
 interface ProjectPageProps {
   projectId: string;
@@ -44,6 +46,7 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newPromptDialogOpen, setNewPromptDialogOpen] = useState(false);
+  const { goHome } = useAppStore();
 
   const fetchPrompts = async () => {
     setLoading(true);
@@ -88,7 +91,6 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
 
   return (
     <div className="h-full flex">
-      {/* Sidebar */}
       <div className={`bg-card border-r transition-all duration-300 ${
         sidebarOpen ? 'w-64' : 'w-16'
       }`}>
@@ -105,36 +107,14 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
               {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
             </Button>
           </div>
-          {/* Prompt Selector inside menu section */}
-          {sidebarOpen && (
-            <div className="mb-6">
-              <div className="font-semibold text-xs text-muted-foreground mb-2">Active Prompt</div>
-              <div className="flex items-center space-x-2 mb-2">
-                <Select value={selectedPromptId ?? ''} onValueChange={setSelectedPromptId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a prompt" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prompts.map((prompt) => (
-                      <SelectItem key={prompt.id} value={prompt.id}>
-                        {prompt.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => setNewPromptDialogOpen(true)}
-              >
-                New Prompt
-              </Button>
-            </div>
-          )}
-          
-          {/* Navigation */}
+          <Button
+            variant="outline"
+            className="w-full justify-start mb-4"
+            onClick={goHome}
+          >
+            <Home className="w-4 h-4 mr-2" />
+            {sidebarOpen && 'Home'}
+          </Button>
           <nav className="space-y-1">
             {navigationItems.map((item) => (
               <Button
@@ -151,7 +131,6 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {renderContent()}
       </div>

@@ -15,7 +15,7 @@ interface NewProjectDialogProps {
 }
 
 export function NewProjectDialog({ open, onOpenChange }: NewProjectDialogProps) {
-  const { addTab } = useAppStore();
+  const { openProject } = useAppStore();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -34,16 +34,8 @@ export function NewProjectDialog({ open, onOpenChange }: NewProjectDialogProps) 
         apiKey: apiKey || undefined,
       });
 
-      // Add the new project to the tabs
-      addTab({
-        id: `project-${response.data.id}`,
-        type: 'project',
-        title: response.data.name,
-        projectId: response.data.id,
-        isClosable: true,
-      });
+      openProject(response.data.id);
 
-      // Reset form and close dialog
       setName('');
       setDescription('');
       setApiKey('');

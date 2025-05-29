@@ -648,17 +648,17 @@ def update_run_result(run_id, new_result_object):
             run = db.query(Run).filter(Run.id == run_id).first()
             if not run:
                 return False
-            logger.debug(f"Run result before update: {run.result}")
+            # logger.debug(f"Run result before update: {run.result}")
             result = run.result
             result[len(result)] = new_result_object
             run.result = result
-            logger.debug(f"Run result after update: {run.result}")
+            # logger.debug(f"Run result after update: {run.result}")
             run.current_test += 1
-            logger.debug(f"Run current test after update: {run.current_test}")
+            # logger.debug(f"Run current test after update: {run.current_test}")
             flag_modified(run, "current_test")
             flag_modified(run, "result")
             db.commit()
-            logger.debug(f"Run result updated: {run.to_dict()}")
+            # logger.debug(f"Run result updated: {run.to_dict()}")
             return True
     except Exception as e:
         logger.error(f"Error updating run result: {traceback.format_exc()}")
