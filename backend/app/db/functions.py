@@ -252,7 +252,7 @@ def get_prompt(prompt_id: int, include_runs = False) -> dict:
                 return False
             prompt_dict = prompt.to_dict()
 
-            versions = db.query(PromptVersion).filter(PromptVersion.prompt_id == prompt_id).order_by(PromptVersion.version_number.desc()).all()
+            versions = db.query(PromptVersion).filter(PromptVersion.prompt_id == prompt_id).order_by(PromptVersion.version_number.asc()).all()
             if not versions:
                 prompt_dict['versions'] = []
                 return prompt_dict
@@ -391,6 +391,19 @@ def get_prompt_versions_by_prompt(prompt_id: int) -> List[dict]:
     except Exception as e:
         logger.error(f"Error getting prompt versions by prompt: {traceback.format_exc()}")
         return []
+
+
+def create_prompt_version(version_data: dict) -> bool:
+    try:
+        with get_db_session() as db:
+            version = PromptVersion(**version_data)
+            db.add(version)
+            db.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error creating prompt version: {traceback.format_exc()}")
+        return False
+
 
 def set_prompt_version(version_data: dict, latest_version: bool = True) -> bool:
     try:
@@ -616,6 +629,7 @@ def delete_testset(testset_id: int) -> bool:
 def create_run(model, prompt_version_id, email, prompt_id, number_of_tests):
     try:
         with get_db_session() as db:
+            logger.debug(f"Creating run with model {model}, prompt_version_id {prompt_version_id}, email {email}, prompt_id {prompt_id}, number_of_tests {number_of_tests}")
             run = Run(model=model, prompt_version_id=prompt_version_id, email=email, prompt_id=prompt_id, number_of_tests=number_of_tests)
             db.add(run)
             db.commit()

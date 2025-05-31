@@ -74,7 +74,7 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
       case 'dashboard':
         return <ProjectDashboard projectId={projectId} />;
       case 'constructor':
-        return <PromptsConstructor projectId={projectId} promptId={selectedPromptId} />;
+        return <PromptsConstructor projectId={projectId} promptId={selectedPromptId} setSelectedPromptId={setSelectedPromptId} />;
       case 'playground':
         return <PromptPlayground projectId={projectId} promptId={selectedPromptId} />;
       case 'testing':

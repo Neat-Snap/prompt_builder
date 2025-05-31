@@ -53,7 +53,7 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
           const found = res.data.find((p: any) => p.id === promptId);
           if (found) {
             setSelectedPromptId(found.id);
-            // Fetch latest version content
+            setPromptLoaded(false);
             const promptRes = await promptsApi.get(projectId, found.id);
             const versions = promptRes.data.versions || [];
             const latest = versions[versions.length - 1];
@@ -74,6 +74,7 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
   const handleSelectPrompt = async (id: string) => {
     setSelectedPromptId(id);
     setPrompt('');
+    setPromptLoaded(false);
     setLoading(true);
     setError(null);
     try {
@@ -81,41 +82,39 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
       const versions = promptRes.data.versions || [];
       const latest = versions[versions.length - 1];
       setPrompt(latest?.prompt_text || '');
+      setPromptLoaded(true);
     } catch (e) {
       setError('Failed to load prompt content.');
+      setPromptLoaded(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // Autosave effect for prompt
   useEffect(() => {
     if (!selectedPromptId) return;
     if (!promptLoaded) return;
     if (prompt === lastSavedPrompt.current) return;
-    if (!prompt && lastSavedPrompt.current) return; // Don't erase existing prompt
+    if (!prompt && lastSavedPrompt.current) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     setSaving(true);
     saveTimeout.current = setTimeout(async () => {
       try {
         const promptRes = await promptsApi.get(projectId, selectedPromptId);
         const versions = promptRes.data.versions || [];
+        const latest = versions[versions.length - 1];
         const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
         await promptsApi.update(projectId, selectedPromptId, {
-          version_number: nextVersion,
           prompt_text: prompt
         });
         lastSavedPrompt.current = prompt;
       } catch (e) {
-        // Optionally handle error
       } finally {
         setSaving(false);
       }
     }, 800);
-    // eslint-disable-next-line
   }, [prompt, selectedPromptId, promptLoaded]);
 
-  // Save immediately when switching prompts
   useEffect(() => {
     didUnmount.current = false;
     return () => {
@@ -124,24 +123,21 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
       if (!promptLoaded) return;
       if (selectedPromptId && prompt !== lastSavedPrompt.current) {
         if (!prompt && lastSavedPrompt.current) return;
-        // Prevent save if unmounting due to reset
         if (didUnmount.current) return;
         setSaving(true);
         promptsApi.get(projectId, selectedPromptId).then(promptRes => {
           const versions = promptRes.data.versions || [];
+          const latest = versions[versions.length - 1];
           const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
           return promptsApi.update(projectId, selectedPromptId, {
-            version_number: nextVersion,
             prompt_text: prompt
           });
         }).finally(() => setSaving(false));
         lastSavedPrompt.current = prompt;
       }
     };
-    // eslint-disable-next-line
   }, [selectedPromptId, promptLoaded]);
 
-  // Model search effect
   useEffect(() => {
     if (!modelSearch) {
       setModelResults([]);
@@ -159,7 +155,6 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
         setModelSearchLoading(false);
       }
     }, 400);
-    // eslint-disable-next-line
   }, [modelSearch]);
 
   const runPlayground = async () => {
@@ -186,7 +181,6 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
       </div>
       {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Prompt Input */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -206,7 +200,6 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                 </Select>
               </div>
             </CardTitle>
-            {/* <div className="text-xs text-muted-foreground mt-1">This prompt will be sent as the <b>system prompt</b> to the model.</div> */}
           </CardHeader>
           <CardContent>
             <Textarea
@@ -228,18 +221,9 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                 className="min-h-[80px] resize-none"
                 disabled={loading}
               />
-              {/* <div className="mt-2 text-xs text-muted-foreground">
-                This will be sent as the <b>user prompt</b> to the model.
-              </div> */}
             </div>
-            {/* {saving && (
-              <div className="absolute bottom-3 right-6 text-xs text-muted-foreground pointer-events-none select-none">
-                Saving...
-              </div>
-            )} */}
           </CardContent>
         </Card>
-        {/* Playground Controls */}
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -264,7 +248,6 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                       setSelectedModelObj(null);
                       setModelSearch('');
                       setModelDropdownOpen(true);
-                      // Focus input after clearing
                       setTimeout(() => e.target.select(), 0);
                     } else {
                       setModelDropdownOpen(true);
@@ -337,7 +320,6 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
               </Button>
             </CardContent>
           </Card>
-          {/* Response Block */}
           <Card>
             <CardHeader>
               <CardTitle>Response</CardTitle>

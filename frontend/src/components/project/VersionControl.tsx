@@ -20,48 +20,62 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { promptsApi } from '@/lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Prompt, PromptVersion } from '@/types';
 
 interface VersionControlProps {
   projectId: string;
   promptId?: string | null;
 }
 
-interface PromptVersion {
-  id: string;
-  version: string;
-  name: string;
-  content: string;
-  author: string;
-  createdAt: Date;
-  parentVersion?: string;
-  metrics: {
-    testCount: number;
-    successRate: number;
-    avgLatency: number;
-    avgCost: number;
-  };
-  tags: string[];
-  notes: string;
-  isActive: boolean;
-}
-
 export function VersionControl({ projectId, promptId }: VersionControlProps) {
-  const [selectedPrompt, setSelectedPrompt] = useState<string>('prompt-1');
-  const [compareMode, setCompareMode] = useState(false);
-  const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(promptId ?? null);
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [manualVersionName, setManualVersionName] = useState('');
+  const [manualVersionComment, setManualVersionComment] = useState('');
 
   useEffect(() => {
-    async function fetchPromptVersions() {
+    async function fetchPrompts() {
       setLoading(true);
       setError(null);
       try {
-        if (promptId) {
-          const res = await promptsApi.get(projectId, promptId);
-          setPromptVersions(res.data.versions || []);
+        const res = await promptsApi.list(projectId);
+        setPrompts(res.data);
+        if (!selectedPromptId && res.data.length > 0) {
+          setSelectedPromptId(res.data[0].id);
         }
+      } catch (e) {
+        setError('Failed to load prompts.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPrompts();
+  }, [projectId]);
+
+  useEffect(() => {
+    async function fetchPromptVersions() {
+      if (!selectedPromptId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await promptsApi.get(projectId, selectedPromptId);
+        const versions = (res.data.versions || []).map((v: any) => ({
+          id: v.id,
+          version: v.version_number,
+          content: v.prompt_text,
+          createdAt: v.created_at,
+          isActive: v.isActive || false,
+          name: v.name || '',
+          comment: v.comment || '',
+        }));
+        setPromptVersions(versions);
       } catch (e) {
         setError('Failed to load prompt versions.');
       } finally {
@@ -69,29 +83,37 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
       }
     }
     fetchPromptVersions();
-  }, [projectId, promptId]);
+  }, [projectId, selectedPromptId]);
 
-  const prompts = [
-    { id: 'prompt-1', name: 'Customer Support Agent' },
-    { id: 'prompt-2', name: 'Product Description Generator' },
-    { id: 'prompt-3', name: 'Email Response Template' }
-  ];
-
-  const createNewVersion = () => {
-    // TODO: Implement new version creation
-    console.log('Creating new version...');
+  const handleSaveManualVersion = async () => {
+    setSaveDialogOpen(false);
+    setManualVersionName('');
+    setManualVersionComment('');
+    if (selectedPromptId) {
+      const res = await promptsApi.get(projectId, selectedPromptId);
+      const versions = (res.data.versions || []).map((v: any) => ({
+        id: v.id,
+        version: v.version_number,
+        content: v.prompt_text,
+        createdAt: v.created_at,
+        isActive: v.isActive || false,
+        name: v.name || '',
+        comment: v.comment || '',
+      }));
+      setPromptVersions(versions);
+    }
   };
 
-  const revertToVersion = (versionId: string) => {
-    // TODO: Implement version revert
-    console.log('Reverting to version:', versionId);
+  const handlePromptSelect = (id: string) => {
+    setSelectedPromptId(id);
+    setSelectedVersions([]);
   };
 
   const toggleVersionSelection = (versionId: string) => {
     if (selectedVersions.includes(versionId)) {
       setSelectedVersions(prev => prev.filter(id => id !== versionId));
     } else {
-      setSelectedVersions(prev => [...prev, versionId].slice(-2)); // Max 2 for comparison
+      setSelectedVersions(prev => [...prev, versionId].slice(-2));
     }
   };
 
@@ -109,15 +131,14 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
             <Eye className="w-4 h-4 mr-2" />
             {compareMode ? 'Exit Compare' : 'Compare Versions'}
           </Button>
-          <Button onClick={createNewVersion}>
+          <Button onClick={() => setSaveDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            New Version
+            Save as Version
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar */}
         <Card>
           <CardHeader>
             <CardTitle>Prompts</CardTitle>
@@ -127,9 +148,9 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
               {prompts.map((prompt) => (
                 <Button
                   key={prompt.id}
-                  variant={selectedPrompt === prompt.id ? 'default' : 'ghost'}
+                  variant={selectedPromptId === prompt.id ? 'default' : 'ghost'}
                   className="w-full justify-start"
-                  onClick={() => setSelectedPrompt(prompt.id)}
+                  onClick={() => handlePromptSelect(prompt.id)}
                 >
                   <GitBranch className="w-4 h-4 mr-2" />
                   {prompt.name}
@@ -139,18 +160,16 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
           </CardContent>
         </Card>
 
-        {/* Main Content */}
         <div className="lg:col-span-3">
           <Tabs defaultValue="timeline" className="w-full">
             <TabsList>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="comparison">Comparison</TabsTrigger>
-              <TabsTrigger value="metrics">Performance</TabsTrigger>
             </TabsList>
 
             <TabsContent value="timeline" className="space-y-4">
               <div className="space-y-4">
-                {promptVersions.map((version, index) => (
+                {[...promptVersions].reverse().map((version, index) => (
                   <Card key={version.id} className={version.isActive ? 'ring-2 ring-primary' : ''}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -161,7 +180,6 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                             </Badge>
                             {version.isActive && <Badge variant="outline">Active</Badge>}
                           </div>
-                          <h3 className="font-semibold">{version.name}</h3>
                         </div>
                         <div className="flex items-center space-x-2">
                           {compareMode && (
@@ -172,30 +190,17 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                               className="rounded"
                             />
                           )}
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(version.content)}>
                             <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => revertToVersion(version.id)}>
-                            <RotateCcw className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-1" />
-                          {version.author}
-                        </div>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-2">
                         <div className="flex items-center">
                           <Clock className="w-4 h-4 mr-1" />
-                          {version.createdAt.toLocaleDateString()}
+                          {version.createdAt ? (typeof version.createdAt === 'string' ? new Date(version.createdAt).toLocaleString() : version.createdAt.toLocaleString()) : ''}
                         </div>
-                        <div className="flex space-x-1">
-                          {version.tags.map(tag => (
-                            <Badge key={tag} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
+                        {version.isActive && <Star className="w-4 h-4 text-yellow-500 ml-2" />}
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -203,37 +208,6 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                         <div className="bg-muted p-3 rounded text-sm">
                           {version.content}
                         </div>
-                        
-                        {version.notes && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">{version.notes}</p>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-4 gap-4 text-sm">
-                          <div className="text-center">
-                            <div className="font-medium">{version.metrics.testCount}</div>
-                            <div className="text-muted-foreground">Tests</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium">{version.metrics.successRate}%</div>
-                            <div className="text-muted-foreground">Success</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium">{version.metrics.avgLatency}ms</div>
-                            <div className="text-muted-foreground">Latency</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium">${version.metrics.avgCost}</div>
-                            <div className="text-muted-foreground">Cost</div>
-                          </div>
-                        </div>
-
-                        {version.parentVersion && index < promptVersions.length - 1 && (
-                          <div className="flex items-center justify-center text-muted-foreground">
-                            <ArrowRight className="w-4 h-4" />
-                          </div>
-                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -247,25 +221,17 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                   {selectedVersions.map(versionId => {
                     const version = promptVersions.find(v => v.id === versionId);
                     if (!version) return null;
-                    
                     return (
                       <Card key={versionId}>
                         <CardHeader>
                           <CardTitle className="flex items-center space-x-2">
                             <Badge>v{version.version}</Badge>
-                            <span>{version.name}</span>
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-4">
                             <div className="bg-muted p-3 rounded text-sm">
                               {version.content}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>Success: {version.metrics.successRate}%</div>
-                              <div>Latency: {version.metrics.avgLatency}ms</div>
-                              <div>Tests: {version.metrics.testCount}</div>
-                              <div>Cost: ${version.metrics.avgCost}</div>
                             </div>
                           </div>
                         </CardContent>
@@ -280,52 +246,32 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                 </div>
               )}
             </TabsContent>
-
-            <TabsContent value="metrics" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <TrendingUp className="w-5 h-5 mr-2" />
-                      Success Rate Trend
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">+13.6%</div>
-                    <p className="text-sm text-muted-foreground">From v1.0 to v2.0</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Clock className="w-5 h-5 mr-2" />
-                      Latency Improvement
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">-300ms</div>
-                    <p className="text-sm text-muted-foreground">Average reduction</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Star className="w-5 h-5 mr-2" />
-                      Best Version
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">v2.0</div>
-                    <p className="text-sm text-muted-foreground">Current active version</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
           </Tabs>
         </div>
       </div>
+
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as New Version</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Version name (optional)"
+              value={manualVersionName}
+              onChange={e => setManualVersionName(e.target.value)}
+            />
+            <Textarea
+              placeholder="Comment (optional)"
+              value={manualVersionComment}
+              onChange={e => setManualVersionComment(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveManualVersion}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -41,6 +41,7 @@ import {
 interface PromptsConstructorProps {
   projectId: string;
   promptId?: string | null;
+  setSelectedPromptId: (id: string | null) => void;
 }
 
 interface PromptBlock {
@@ -65,7 +66,7 @@ const PREDEFINED_BLOCK_TYPES = {
   examples: 'Examples',
 } as const;
 
-export function PromptsConstructor({ projectId, promptId }: PromptsConstructorProps) {
+export function PromptsConstructor({ projectId, promptId, setSelectedPromptId }: PromptsConstructorProps) {
   const [promptBuilder, setPromptBuilder] = useState<PromptBuilder>({
     name: '',
     blocks: []
@@ -83,7 +84,6 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
   const didUnmount = useRef(false);
 
   const [prompts, setPrompts] = useState<{ id: string; name: string }[]>([]);
-  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(promptId ?? null);
   const [newPromptDialogOpen, setNewPromptDialogOpen] = useState(false);
 
   const resetForm = () => {
@@ -129,6 +129,7 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
             blocks
           });
           setGeneratedPrompt(latestVersion?.prompt_text || '');
+          lastSavedPrompt.current = latestVersion?.prompt_text || '';
           setPromptLoaded(true);
         })
         .catch(() => {
@@ -154,6 +155,7 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
       try {
         const promptRes = await promptsApi.get(projectId, promptId);
         const versions = (promptRes.data && promptRes.data.versions) ? promptRes.data.versions : [];
+        const latestVersion = versions[versions.length - 1];
         const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
         await promptsApi.update(projectId, promptId, {
           version_number: nextVersion,
@@ -179,6 +181,7 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
         setLoading(true);
         promptsApi.get(projectId, promptId).then(promptRes => {
           const versions = (promptRes.data && promptRes.data.versions) ? promptRes.data.versions : [];
+          const latestVersion = versions[versions.length - 1];
           const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
           return promptsApi.update(projectId, promptId, {
             version_number: nextVersion,
@@ -274,6 +277,7 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
       if (promptId) {
         const promptRes = await promptsApi.get(projectId, promptId);
         const versions = (promptRes.data && promptRes.data.versions) ? promptRes.data.versions : [];
+        const latestVersion = versions[versions.length - 1];
         const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
         
         await promptsApi.update(projectId, promptId, {
@@ -304,7 +308,7 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
       try {
         const res = await promptsApi.list(projectId);
         setPrompts(res.data);
-        if (!selectedPromptId && res.data.length > 0) {
+        if (!promptId && res.data.length > 0) {
           setSelectedPromptId(res.data[0].id);
         }
       } catch {
@@ -312,11 +316,6 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
     }
     fetchPrompts();
   }, [projectId, newPromptDialogOpen]);
-
-  useEffect(() => {
-    if (selectedPromptId && selectedPromptId !== promptId) {
-    }
-  }, [selectedPromptId]);
 
   return (
     <div className="p-6">
@@ -331,7 +330,7 @@ export function PromptsConstructor({ projectId, promptId }: PromptsConstructorPr
         <div className="w-72">
           <Label htmlFor="prompt-selector">Prompt</Label>
           <Select
-            value={selectedPromptId ?? ''}
+            value={promptId ?? ''}
             onValueChange={val => {
               if (val === '__new__') {
                 setNewPromptDialogOpen(true);

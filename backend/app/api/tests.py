@@ -28,8 +28,8 @@ def run_testset(email, testset_data, prompt_id, model, version_id=-1):
             else:
                 raise HTTPException(status_code=404, detail="Version not found")
     else:
-        version_id = versions[0]["id"]
-        system_prompt = versions[0]["prompt_text"]
+        version_id = versions[-1]["id"]
+        system_prompt = versions[-1]["prompt_text"]
 
     user_api_key = get_user_keys(email)["openrouter"]
 

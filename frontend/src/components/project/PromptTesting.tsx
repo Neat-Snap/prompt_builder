@@ -64,7 +64,12 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
         setSavedPrompts(res.data);
         if (promptId) {
           const found = res.data.find((p: any) => p.id === promptId);
-          if (found) setPrompt(found.content);
+          if (found) {
+            const promptRes = await promptsApi.get(projectId, found.id);
+            const versions = promptRes.data.versions || [];
+            const latest = versions[versions.length - 1];
+            setPrompt(latest?.prompt_text || '');
+          }
         }
       } catch (e) {
         setError('Failed to load prompts.');
@@ -80,18 +85,16 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
 
     setIsRunning(true);
     
-    // Mock API calls - replace with real implementation
     for (const modelId of selectedModels) {
       const model = availableModels.find(m => m.id === modelId);
       if (!model) continue;
 
-      // Simulate API call
       setTimeout(() => {
         const mockResult: TestResult = {
           id: Math.random().toString(36).substr(2, 9),
           model: model.name,
           response: `This is a mock response from ${model.name}. In a real implementation, this would be the actual AI response to your prompt. The response quality and style would vary based on the model's capabilities and training.`,
-          latency: Math.random() * 3000 + 500, // 500-3500ms
+          latency: Math.random() * 3000 + 500,
           tokens: Math.floor(Math.random() * 500) + 100,
           cost: parseFloat((Math.random() * 0.1 + 0.01).toFixed(4)),
           timestamp: new Date(),
@@ -136,7 +139,6 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Input Panel */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader>
@@ -175,7 +177,6 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
             </CardContent>
           </Card>
 
-          {/* Test Results */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -237,7 +238,6 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
           </Card>
         </div>
 
-        {/* Control Panel */}
         <div className="space-y-4">
           <Card>
             <CardHeader>

@@ -6,6 +6,8 @@ from app.utils.auth import generate_jwt_token, hash_password
 import loguru
 import hashlib
 
+from difflib import SequenceMatcher, ndiff
+
 router = APIRouter(
     prefix="/users",
     tags=["users"]
@@ -23,6 +25,27 @@ Then there are endpoints that allow to get, edit or delete a particular project 
 These endpoints are divided into two groups: one for editing the prompt object (in which you can only edit the name of the prompt) and the other for editing the other prompt info (all prompt info is stored in the PromptVersion object).
 - In general, the rule is that if we need to edit the prompt content, comments, version, etc - we need to call endpoints that work with PromptVersion objects, not Prompt objects. Otherwise, if we need to change the name of the intire prompt or delete it, we need to call endpoints that work with Prompt objects.
 """
+
+
+def check_prompt_change(new_text: str, old_text: str): 
+    logger.debug(f"Checking prompt change: {new_text} - new text, {old_text} - old text")
+    if not old_text:
+        return True, None
+
+    matcher = SequenceMatcher(None, new_text, old_text)
+    ratio = matcher.ratio()
+
+    logger.debug(f"Checking prompt change: {ratio}")
+
+    if ratio < 0.92:
+        new_lines = new_text.splitlines()
+        old_lines = old_text.splitlines()
+        diff = ndiff(old_lines, new_lines)
+        return True, "\n".join(diff)
+    
+    return False, None
+
+
 
 @router.get("/me")
 async def get_me_endpoint(request: Request):
@@ -136,7 +159,25 @@ async def update_prompt_version_endpoint(request: Request, project_id: str, prom
         raise HTTPException(status_code=401, detail="Unauthorized")
     prompt = await request.json()
     prompt["prompt_id"] = prompt_id
-    return set_prompt_version(prompt)
+
+    if "version_number" in prompt:
+        del prompt["version_number"]
+
+    new_text = prompt.get("prompt_text")
+
+    previous_versions = get_prompt_versions_by_prompt(prompt_id)
+
+    old_version = previous_versions[-1] if previous_versions else None
+    logger.debug(f"Old version: {old_version}")
+    old_text = old_version.get("prompt_text") if old_version else None
+    old_version_number = old_version.get("version_number") if old_version else None
+
+    is_significant_change, _ = check_prompt_change(new_text, old_text)
+    if is_significant_change:
+        prompt["version_number"] = old_version_number + 1 if old_version_number else 1
+        return create_prompt_version(prompt)
+    else:
+        return set_prompt_version(prompt)
 
 
 @router.delete("/projects/{project_id}/prompts/{prompt_id}")
