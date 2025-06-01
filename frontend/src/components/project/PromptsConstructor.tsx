@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SaveCustomVersionDialog } from './SaveCustomVersionDialog';
 
 interface PromptsConstructorProps {
   projectId: string;
@@ -85,6 +86,8 @@ export function PromptsConstructor({ projectId, promptId, setSelectedPromptId }:
 
   const [prompts, setPrompts] = useState<{ id: string; name: string }[]>([]);
   const [newPromptDialogOpen, setNewPromptDialogOpen] = useState(false);
+  const [customVersionDialogOpen, setCustomVersionDialogOpen] = useState(false);
+  const [customVersionLoading, setCustomVersionLoading] = useState(false);
 
   const resetForm = () => {
     setPromptBuilder({
@@ -317,6 +320,30 @@ export function PromptsConstructor({ projectId, promptId, setSelectedPromptId }:
     fetchPrompts();
   }, [projectId, newPromptDialogOpen]);
 
+  const saveCustomVersion = async (name: string, comment: string) => {
+    setCustomVersionLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      if (promptId) {
+        const promptRes = await promptsApi.get(projectId, promptId);
+        const versions = (promptRes.data && promptRes.data.versions) ? promptRes.data.versions : [];
+        const latestVersion = versions[versions.length - 1];
+        const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+        await promptsApi.update(projectId, promptId, {
+          version_number: nextVersion,
+          prompt_text: generatedPrompt,
+          comments: { name, comment },
+        });
+        setSuccess('Custom version saved!');
+      }
+    } catch (e) {
+      setError('Failed to save custom version.');
+    } finally {
+      setCustomVersionLoading(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -352,6 +379,15 @@ export function PromptsConstructor({ projectId, promptId, setSelectedPromptId }:
             </SelectContent>
           </Select>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCustomVersionDialogOpen(true)}
+          disabled={!promptId || loading}
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Save Custom Version
+        </Button>
       </div>
 
       <NewPromptDialog
@@ -361,6 +397,13 @@ export function PromptsConstructor({ projectId, promptId, setSelectedPromptId }:
         onPromptCreated={() => {
           setNewPromptDialogOpen(false);
         }}
+      />
+
+      <SaveCustomVersionDialog
+        open={customVersionDialogOpen}
+        onOpenChange={setCustomVersionDialogOpen}
+        onSave={saveCustomVersion}
+        loading={customVersionLoading}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

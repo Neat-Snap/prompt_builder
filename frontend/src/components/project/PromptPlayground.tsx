@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { Play, RefreshCw, Copy, Save, Check, X as XIcon } from 'lucide-react';
 import { promptsApi, llmApi } from '@/lib/api';
+import { SaveCustomVersionDialog } from './SaveCustomVersionDialog';
 
 interface PromptPlaygroundProps {
   projectId: string;
@@ -41,6 +42,8 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
   const lastSavedPrompt = useRef<string>('');
   const [promptLoaded, setPromptLoaded] = useState(false);
   const didUnmount = useRef(false);
+  const [customVersionDialogOpen, setCustomVersionDialogOpen] = useState(false);
+  const [customVersionLoading, setCustomVersionLoading] = useState(false);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -173,6 +176,27 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
     }
   };
 
+  const saveCustomVersion = async (name: string, comment: string) => {
+    setCustomVersionLoading(true);
+    setError(null);
+    try {
+      if (selectedPromptId) {
+        const promptRes = await promptsApi.get(projectId, selectedPromptId);
+        const versions = promptRes.data.versions || [];
+        const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+        await promptsApi.update(projectId, selectedPromptId, {
+          version_number: nextVersion,
+          prompt_text: prompt,
+          comments: { name, comment },
+        });
+      }
+    } catch (e) {
+      setError('Failed to save custom version.');
+    } finally {
+      setCustomVersionLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -198,6 +222,15 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCustomVersionDialogOpen(true)}
+                  disabled={!selectedPromptId || loading}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Custom Version
+                </Button>
               </div>
             </CardTitle>
           </CardHeader>
@@ -339,6 +372,12 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
           </Card>
         </div>
       </div>
+      <SaveCustomVersionDialog
+        open={customVersionDialogOpen}
+        onOpenChange={setCustomVersionDialogOpen}
+        onSave={saveCustomVersion}
+        loading={customVersionLoading}
+      />
     </div>
   );
 } 

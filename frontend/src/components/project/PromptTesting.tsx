@@ -22,6 +22,7 @@ import {
   Settings
 } from 'lucide-react';
 import { promptsApi } from '@/lib/api';
+import { SaveCustomVersionDialog } from './SaveCustomVersionDialog';
 
 interface PromptTestingProps {
   projectId: string;
@@ -47,6 +48,8 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
   const [savedPrompts, setSavedPrompts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [customVersionDialogOpen, setCustomVersionDialogOpen] = useState(false);
+  const [customVersionLoading, setCustomVersionLoading] = useState(false);
 
   const availableModels = [
     { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI', cost: '$0.03/1K tokens' },
@@ -129,6 +132,27 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
     URL.revokeObjectURL(url);
   };
 
+  const saveCustomVersion = async (name: string, comment: string) => {
+    setCustomVersionLoading(true);
+    setError(null);
+    try {
+      if (promptId) {
+        const promptRes = await promptsApi.get(projectId, promptId);
+        const versions = promptRes.data.versions || [];
+        const nextVersion = versions.length > 0 ? Math.max(...versions.map((v: any) => v.version_number)) + 1 : 1;
+        await promptsApi.update(projectId, promptId, {
+          version_number: nextVersion,
+          prompt_text: prompt,
+          comments: { name, comment },
+        });
+      }
+    } catch (e) {
+      setError('Failed to save custom version.');
+    } finally {
+      setCustomVersionLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -157,9 +181,14 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCustomVersionDialogOpen(true)}
+                    disabled={!promptId || loading}
+                  >
                     <Save className="w-4 h-4 mr-2" />
-                    Save
+                    Save Custom Version
                   </Button>
                 </div>
               </CardTitle>
@@ -337,6 +366,13 @@ export function PromptTesting({ projectId, promptId }: PromptTestingProps) {
           )}
         </div>
       </div>
+
+      <SaveCustomVersionDialog
+        open={customVersionDialogOpen}
+        onOpenChange={setCustomVersionDialogOpen}
+        onSave={saveCustomVersion}
+        loading={customVersionLoading}
+      />
     </div>
   );
 }

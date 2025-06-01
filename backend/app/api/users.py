@@ -172,12 +172,16 @@ async def update_prompt_version_endpoint(request: Request, project_id: str, prom
     old_text = old_version.get("prompt_text") if old_version else None
     old_version_number = old_version.get("version_number") if old_version else None
 
-    is_significant_change, _ = check_prompt_change(new_text, old_text)
-    if is_significant_change:
+    if "comments" in prompt:
         prompt["version_number"] = old_version_number + 1 if old_version_number else 1
         return create_prompt_version(prompt)
     else:
-        return set_prompt_version(prompt)
+        is_significant_change, _ = check_prompt_change(new_text, old_text)
+        if is_significant_change:
+            prompt["version_number"] = old_version_number + 1 if old_version_number else 1
+            return create_prompt_version(prompt)
+        else:
+            return set_prompt_version(prompt)
 
 
 @router.delete("/projects/{project_id}/prompts/{prompt_id}")
