@@ -117,6 +117,32 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
     }
   };
 
+  const handleMakeLatest = async (version: PromptVersion) => {
+    if (!selectedPromptId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await promptsApi.update(projectId, selectedPromptId, {
+        prompt_text: version.content,
+      });
+      const res = await promptsApi.get(projectId, selectedPromptId);
+      const versions = (res.data.versions || []).map((v: any) => ({
+        id: v.id,
+        version: v.version_number,
+        content: v.prompt_text,
+        createdAt: v.created_at,
+        isActive: v.isActive || false,
+        name: v.name || '',
+        comment: v.comment || '',
+      }));
+      setPromptVersions(versions);
+    } catch (e) {
+      setError('Failed to make this version the latest.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -192,6 +218,9 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                           )}
                           <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(version.content)}>
                             <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleMakeLatest(version)}>
+                            Make the latest
                           </Button>
                         </div>
                       </div>
