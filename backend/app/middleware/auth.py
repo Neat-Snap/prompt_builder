@@ -37,6 +37,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
             if not get_user_by_email(payload["sub"]):
                 return JSONResponse(status_code=401, content={"detail": "Invalid or expired token"})
+            
+            if not get_user_by_email(payload["sub"])["is_verified"]:
+                return JSONResponse(status_code=401, content={"detail": "Email not verified"})
 
             request.state.email = payload["sub"]
         except PyJWTError:
