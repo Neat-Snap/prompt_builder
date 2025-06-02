@@ -7,7 +7,6 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -16,15 +15,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear the token
       localStorage.removeItem('token');
       
-      // Only redirect if we're not already on the login or signup page
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login') && !currentPath.includes('/signup')) {
         window.location.href = '/signup';
@@ -44,6 +40,10 @@ export const authApi = {
     return api.post('/auth/logout');
   },
   me: () => api.get('users/me'),
+  sendVerificationEmail: (email: string) =>
+    api.post('/auth/send_email', { email }),
+  verifyEmailCode: (code: string) =>
+    api.post('/auth/verify_code', { code }),
 };
 
 export const projectsApi = {
@@ -70,19 +70,12 @@ export const llmApi = {
 };
 
 export const testsetsApi = {
-  // Get all testsets for a project
   list: (projectId: string | number) => api.get(`/tests/testsets/${projectId}`),
-  // Create a new testset for a project
   create: (projectId: string | number, data: { name: string }) => api.post(`/tests/testsets/${projectId}`, data),
-  // Add a test to a testset
   addTest: (testsetId: string | number, prompt: string) => api.post(`/tests/testsets/${testsetId}/tests`, { prompt }),
-  // Delete a test from a testset
   deleteTest: (testsetId: string | number, testId: string | number) => api.delete(`/tests/testsets/${testsetId}/tests/${testId}`),
-  // Delete a testset
   deleteTestset: (testsetId: string | number) => api.delete(`/tests/testsets/${testsetId}`),
-  // Run a testset
   run: (projectId: string | number, data: { testset_id: number, prompt_id: string, model: string }) => api.post(`/tests/run_testset/${projectId}`, data),
-  // Check run status
   checkRun: (promptVersionId: string | number) => api.get(`/tests/check_run/${promptVersionId}`),
 };
 

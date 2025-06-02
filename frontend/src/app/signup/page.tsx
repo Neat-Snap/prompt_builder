@@ -24,7 +24,8 @@ export default function SignupPage() {
     try {
       const response = await authApi.register(email, password, name);
       localStorage.setItem('token', response.data.token);
-      router.push('/');
+      localStorage.setItem('pendingVerificationEmail', email);
+      router.push('/verify');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to create account. Please try again.');
     } finally {

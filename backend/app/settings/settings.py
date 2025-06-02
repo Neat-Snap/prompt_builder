@@ -15,5 +15,5 @@ class Settings:
     ALGORITHM = os.getenv("ALGORITHM")
     ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("ACCESS_TOKEN_EXPIRE_HOURS"))
     AUDIENCE = os.getenv("AUDIENCE")
-
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 settings = Settings()

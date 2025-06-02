@@ -17,18 +17,21 @@ export default function Home() {
       setLoading(true);
       setError(null);
       try {
-        // Check if we have a token
         const token = localStorage.getItem('token');
         if (!token) {
           router.push('/login');
           return;
         }
 
-        // Fetch user
         const userRes = await authApi.me();
         setUser(userRes.data);
         
-        // Fetch projects
+        if (!userRes.data.is_verified) {
+          localStorage.setItem('pendingVerificationEmail', userRes.data.email);
+          router.push('/verify');
+          return;
+        }
+        
         const projectsRes = await projectsApi.list();
         setProjects(projectsRes.data);
       } catch (err: any) {
