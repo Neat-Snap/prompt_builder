@@ -68,11 +68,18 @@ async def get_projects_endpoint(request: Request):
 
 @router.post("/projects")
 async def create_project_endpoint(request: Request):
-    email = request.state.email
-    user_id = get_user_by_email(email)["id"]
-    project = await request.json()
-    project["user_id"] = user_id
-    return set_project(project)
+    try:
+        email = request.state.email
+        user_id = get_user_by_email(email)["id"]
+        project = await request.json()
+        project["user_id"] = user_id
+
+        result = set_project(project)
+
+        return result
+    except Exception as e:
+        logger.error(f"Error creating project: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/projects/{project_id}")
@@ -132,7 +139,15 @@ async def create_prompt_endpoint(request: Request, project_id: str):
         raise HTTPException(status_code=401, detail="Unauthorized")
     prompt = await request.json()
     prompt["project_id"] = project_id
-    return create_prompt_with_version(prompt)
+
+    result = create_prompt_with_version(prompt)
+
+    if result:
+        log_action(project_id, "Prompt created", "new")
+    else:
+        log_action(project_id, "Prompt creation failed", "error")
+
+    return result
 
 
 @router.get("/projects/{project_id}/prompts/{prompt_id}")
@@ -195,3 +210,11 @@ async def delete_prompt_endpoint(request: Request, project_id: str, prompt_id: s
         raise HTTPException(status_code=401, detail="Unauthorized")
     return delete_prompt(prompt_id)
 
+
+@router.get("/actions/{project_id}")
+async def get_project_actions_endpoint(request: Request, project_id: str):
+    email = request.state.email
+    user_id = get_user_by_email(email)["id"]
+    if user_id != get_project(project_id)["user_id"]:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return get_project_actions(project_id)

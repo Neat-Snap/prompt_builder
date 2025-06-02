@@ -43,6 +43,8 @@ class Project(Base):
     prompts = relationship("Prompt", back_populates="project")
     tests = relationship("TestSet", back_populates="project")
 
+    actions = relationship("Action", back_populates="project")
+
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
@@ -54,6 +56,7 @@ class Prompt(Base):
     project = relationship("Project", back_populates="prompts")
     versions = relationship("PromptVersion", back_populates="prompt", cascade="all, delete-orphan")
     runs = relationship("Run", back_populates="prompt")
+    
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -135,6 +138,21 @@ class TestSet(Base):
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+    
+
+class Action(Base):
+    __tablename__ = "actions"
+    id = Column(BigInteger, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=func.now())
+    type = Column(String, nullable=False)
+
+    project_id = Column(BigInteger, ForeignKey("projects.id"))
+    project = relationship("Project", back_populates="actions")
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 
 Base.metadata.create_all(bind=engine)
 logger.info("Created all tables")

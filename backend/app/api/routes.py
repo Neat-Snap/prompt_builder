@@ -15,9 +15,6 @@ def register_routes(app: FastAPI):
     app.include_router(llm_router)
     app.include_router(tests_router)
 
-    logger.info(f"Registered auth router: {auth_router.prefix}")
-    logger.info(f"Registered users router: {users_router.prefix}")
-    logger.info(f"Registered llm router: {llm_router.prefix}")
-    logger.info(f"Registered tests router: {tests_router.prefix}")
+    logger.info(f"Registered all {len(app.routes)} routes")
     
     return app

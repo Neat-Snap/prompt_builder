@@ -13,7 +13,7 @@ import {
   Target
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { projectsApi, promptsApi } from '@/lib/api';
+import { projectsApi, promptsApi, actionsApi } from '@/lib/api';
 
 interface ProjectDashboardProps {
   projectId: string;
@@ -21,6 +21,7 @@ interface ProjectDashboardProps {
 
 export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   const [projectStats, setProjectStats] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,14 +30,22 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
       setLoading(true);
       setError(null);
       try {
-        const [projectRes, promptsRes] = await Promise.all([
+        const [projectRes, promptsRes, actionsRes] = await Promise.all([
           projectsApi.get(projectId),
           promptsApi.list(projectId),
+          actionsApi.list(projectId),
         ]);
         setProjectStats({
           ...projectRes.data,
           totalPrompts: promptsRes.data.length,
         });
+        const activities = (actionsRes.data || []).map((action: any, idx: number) => ({
+          id: action.id || idx,
+          action: action.name,
+          time: action.timestamp ? new Date(action.timestamp).toLocaleString() : '',
+          status: action.type || 'info',
+        }));
+        setRecentActivity(activities);
       } catch (e) {
         setError('Failed to load project stats.');
       } finally {
@@ -48,13 +57,6 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 
   if (loading) return <div className="p-8 text-center">Loading project stats...</div>;
   if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
-
-  const recentActivity = [
-    { id: 1, action: 'Prompt "Customer Support V3" tested with GPT-4', time: '2 min ago', status: 'success' },
-    { id: 2, action: 'New prompt "Product Description" created', time: '15 min ago', status: 'info' },
-    { id: 3, action: 'Prompt "Email Generator" updated to v2.1', time: '1 hour ago', status: 'info' },
-    { id: 4, action: 'Test failed for "Code Review" prompt', time: '2 hours ago', status: 'error' },
-  ];
 
   const topModels = [
     { name: 'GPT-4', usage: 145, cost: 8.32, successRate: 98.1 },

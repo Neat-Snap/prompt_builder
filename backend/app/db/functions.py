@@ -5,7 +5,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from datetime import datetime, timedelta
 from app.db.session import get_db_session
-from app.db.models import User, Project, Prompt, PromptVersion, Run, TestSet
+from app.db.models import User, Project, Prompt, PromptVersion, Run, TestSet, Action
 import loguru
 import traceback
 from app.utils.auth import hash_password
@@ -399,9 +399,13 @@ def create_prompt_version(version_data: dict) -> bool:
             version = PromptVersion(**version_data)
             db.add(version)
             db.commit()
+
+            log_action(version_data.get("project_id"), f"New prompt version {version_data.get('version_number')} created", "new")
+
             return True
     except Exception as e:
         logger.error(f"Error creating prompt version: {traceback.format_exc()}")
+        log_action(version_data.get("project_id"), f"New prompt version {version_data.get('version_number')} creation failed", "error")
         return False
 
 
@@ -419,6 +423,9 @@ def set_prompt_version(version_data: dict, latest_version: bool = True) -> bool:
                 version = PromptVersion(**version_data)
                 db.add(version)
                 db.commit()
+
+                log_action(version_data.get("project_id"), f"New prompt version {version_data.get('version_number')} created", "new")
+
                 return True
             logger.debug(f"Updating existing prompt version: {version_data}")
             for key, value in version_data.items():
@@ -426,6 +433,9 @@ def set_prompt_version(version_data: dict, latest_version: bool = True) -> bool:
                     setattr(version, key, value)
             db.add(version)
             db.commit()
+
+            log_action(version_data.get("project_id"), f"Prompt version {version_data.get('version_number')} updated", "update")
+            
             return True
     except Exception as e:
         logger.error(f"Error setting prompt version: {traceback.format_exc()}")
@@ -686,3 +696,25 @@ def check_run(prompt_version_id: int) -> dict:
             return run.to_dict()
     except Exception as e:
         logger.error(f"Error checking run: {traceback.format_exc()}")
+
+
+def log_action(project_id: int, name: str, type: str):
+    try:
+        with get_db_session() as db:
+            action = Action(project_id=project_id, name=name, type=type)
+            db.add(action)
+            db.commit()
+            return action.to_dict()
+    except Exception as e:
+        logger.error(f"Error logging action: {traceback.format_exc()}")
+        return False
+
+
+def get_project_actions(project_id: int, limit: int = 20) -> List[dict]:
+    try:
+        with get_db_session() as db:
+            actions = db.query(Action).filter(Action.project_id == project_id).order_by(Action.timestamp.desc()).limit(limit).all()
+            return [action.to_dict() for action in actions]
+    except Exception as e:
+        logger.error(f"Error getting project actions: {traceback.format_exc()}")
+        return []

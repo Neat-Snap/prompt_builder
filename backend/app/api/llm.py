@@ -67,6 +67,13 @@ async def make_llm_request_endpoint(request: Request):
     openrouter_key = user_keys["openrouter"]
 
     result = make_llm_request(openrouter_key, system_prompt, user_prompt, model)
+
+    # with get_db_session() as db:
+    #     project_id = db.query(Project).filter(Project.prompts == email).first().id
+    # if result:
+    #     log_action(project_id, f"Finished running playground test with {model}", "success")
+    # else:
+    #     log_action(project_id, f"Error running playground test with {model}", "error")
     
     return {"result": result, "success": True}
 

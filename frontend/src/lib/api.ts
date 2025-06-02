@@ -79,4 +79,8 @@ export const testsetsApi = {
   checkRun: (promptVersionId: string | number) => api.get(`/tests/check_run/${promptVersionId}`),
 };
 
+export const actionsApi = {
+  list: (projectId: string) => api.get(`/users/actions/${projectId}`),
+};
+
 export default api;

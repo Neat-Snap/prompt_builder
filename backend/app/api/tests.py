@@ -19,42 +19,49 @@ logger = loguru.logger
 
 
 def run_testset(email, testset_data, prompt_id, model, version_id=-1):
-    versions = get_prompt(prompt_id)["versions"]
-    if version_id != -1:
-        for version in versions:
-            if version["id"] == version_id:
-                system_prompt = version["prompt _text"]
-                break
-            else:
-                raise HTTPException(status_code=404, detail="Version not found")
-    else:
-        version_id = versions[-1]["id"]
-        system_prompt = versions[-1]["prompt_text"]
+    try:
+        versions = get_prompt(prompt_id)["versions"]
+        if version_id != -1:
+            for version in versions:
+                if version["id"] == version_id:
+                    system_prompt = version["prompt _text"]
+                    break
+                else:
+                    raise HTTPException(status_code=404, detail="Version not found")
+        else:
+            version_id = versions[-1]["id"]
+            system_prompt = versions[-1]["prompt_text"]
 
-    user_api_key = get_user_keys(email)["openrouter"]
+        user_api_key = get_user_keys(email)["openrouter"]
 
-    logger.debug(f"Running testset {testset_data['id']} for prompt {prompt_id} with model {model}")
+        project_id = testset_data["project_id"]
 
-    number_of_tests = len(testset_data["tests"])
+        logger.debug(f"Running testset {testset_data['id']} for prompt {prompt_id} with model {model}")
 
-    run = create_run(model, version_id, email, prompt_id, number_of_tests=number_of_tests)
+        number_of_tests = len(testset_data["tests"])
 
-    logger.debug(f"Created run {run['id']}")
+        run = create_run(model, version_id, email, prompt_id, number_of_tests=number_of_tests)
 
-    update_run(run["id"], status="In Progress")
-    test_number = 0
-    for test in testset_data["tests"]:
-        test_user_prompt = test["prompt"]
+        logger.debug(f"Created run {run['id']}")
 
-        logger.debug(f"Running test {test_number} of {number_of_tests} with key {user_api_key}")
+        update_run(run["id"], status="In Progress")
+        test_number = 0
+        for test in testset_data["tests"]:
+            test_user_prompt = test["prompt"]
 
-        result = make_llm_request(user_api_key, system_prompt, test_user_prompt, model)
+            logger.debug(f"Running test {test_number} of {number_of_tests} with key {user_api_key}")
 
-        logger.debug(f"Result: {result}")
+            result = make_llm_request(user_api_key, system_prompt, test_user_prompt, model)
 
-        update_run_result(run["id"], result)
-    
-    update_run(run["id"], status="Finished")
+            logger.debug(f"Result: {result}")
+
+            update_run_result(run["id"], result)
+        
+        update_run(run["id"], status="Finished")
+        log_action(project_id, f"Finished running testset model {model}", "success")
+    except:
+        log_action(project_id, f"Error running testset model {model}", "error")
+        logger.error(f"Error running testset with model {model}")
 
 
 @router.get("/testsets/{project_id}")
@@ -74,7 +81,13 @@ async def create_testset_endpoint(request: Request, project_id: int):
         raise HTTPException(status_code=401, detail="Unauthorized")
     testset_data = await request.json()
     testset_data["project_id"] = project_id
-    return create_testset(testset_data)
+    result = create_testset(testset_data)
+
+    if result:
+        log_action(project_id, f"Created new testset", "new")
+    else:
+        log_action(project_id, f"Error creating testset", "error")
+    return result
 
 
 @router.post("/testsets/{testset_id}/tests")
