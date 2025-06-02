@@ -11,3 +11,5 @@
 *.pyc
 
 *agents*
+
+!.env.example
