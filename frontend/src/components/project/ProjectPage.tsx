@@ -26,6 +26,8 @@ import { useAppStore } from '@/lib/store';
 
 interface ProjectPageProps {
   projectId: string;
+  initialTab?: string;
+  initialPromptId?: string | null;
 }
 
 type ProjectView = 'dashboard' | 'constructor' | 'playground' | 'testing' | 'versions';
@@ -38,15 +40,26 @@ const navigationItems = [
   { id: 'versions', label: 'Version Control', icon: GitBranch },
 ];
 
-export function ProjectPage({ projectId }: ProjectPageProps) {
-  const [activeView, setActiveView] = useState<ProjectView>('dashboard');
+export function ProjectPage({ projectId, initialTab = 'dashboard', initialPromptId = null }: ProjectPageProps) {
+  const [activeView, _setActiveView] = useState<ProjectView>(initialTab as ProjectView);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [selectedPromptId, _setSelectedPromptId] = useState<string | null>(initialPromptId);
   const [prompts, setPrompts] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newPromptDialogOpen, setNewPromptDialogOpen] = useState(false);
   const { goHome } = useAppStore();
+
+  const setActiveViewAndPersist = (view: ProjectView) => {
+    _setActiveView(view);
+    const key = `prompt_builder__projectTab__${projectId}`;
+    window.localStorage.setItem(key, JSON.stringify({ tab: view, promptId: selectedPromptId }));
+  };
+  const setSelectedPromptIdAndPersist = (id: string | null) => {
+    _setSelectedPromptId(id);
+    const key = `prompt_builder__projectTab__${projectId}`;
+    window.localStorage.setItem(key, JSON.stringify({ tab: activeView, promptId: id }));
+  };
 
   const fetchPrompts = async () => {
     setLoading(true);
@@ -55,7 +68,7 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
       const res = await promptsApi.list(projectId);
       setPrompts(res.data);
       if (res.data.length > 0 && !selectedPromptId) {
-        setSelectedPromptId(res.data[0].id);
+        setSelectedPromptIdAndPersist(res.data[0].id);
       }
     } catch (err) {
       setError('Failed to load prompts.');
@@ -74,7 +87,7 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
       case 'dashboard':
         return <ProjectDashboard projectId={projectId} />;
       case 'constructor':
-        return <PromptsConstructor projectId={projectId} promptId={selectedPromptId} setSelectedPromptId={setSelectedPromptId} />;
+        return <PromptsConstructor projectId={projectId} promptId={selectedPromptId} setSelectedPromptId={setSelectedPromptIdAndPersist} />;
       case 'playground':
         return <PromptPlayground projectId={projectId} promptId={selectedPromptId} />;
       case 'testing':
@@ -121,7 +134,7 @@ export function ProjectPage({ projectId }: ProjectPageProps) {
                 key={item.id}
                 variant={activeView === item.id ? 'default' : 'ghost'}
                 className="w-full justify-start"
-                onClick={() => setActiveView(item.id as ProjectView)}
+                onClick={() => setActiveViewAndPersist(item.id as ProjectView)}
               >
                 <item.icon className="w-4 h-4 mr-2" />
                 {sidebarOpen && item.label}

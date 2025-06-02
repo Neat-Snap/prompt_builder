@@ -244,7 +244,7 @@ def get_project_prompt_versions(project_id: int, prompt_id: int) -> List[dict]:
 
 
 # Prompt functions
-def get_prompt(prompt_id: int, include_runs = False) -> dict:
+def get_prompt(prompt_id: int, include_runs = True) -> dict:
     try:
         with get_db_session() as db:
             prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
@@ -261,10 +261,10 @@ def get_prompt(prompt_id: int, include_runs = False) -> dict:
                 prompt_dict['versions'] = []
             for version in versions:
                 version_dict = version.to_dict()
-                # if include_runs:
-                #     version_dict['runs'] = [run.to_dict() for run in version.runs]
-                # else:
-                #     del version_dict['runs']
+                if include_runs:
+                    version_dict['runs'] = [run.to_dict() for run in version.runs]
+                else:
+                    del version_dict['runs']
                 prompt_dict['versions'].append(version_dict)
             return prompt_dict
     except Exception as e:

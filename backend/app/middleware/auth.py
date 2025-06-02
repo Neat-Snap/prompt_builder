@@ -16,7 +16,6 @@ def check_url(url):
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Allow OPTIONS requests to pass through
         if request.method == "OPTIONS":
             return await call_next(request)
 

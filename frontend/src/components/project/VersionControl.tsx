@@ -17,16 +17,21 @@ import {
   Plus,
   ArrowRight,
   TrendingUp,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { promptsApi } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Prompt, PromptVersion } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface VersionControlProps {
   projectId: string;
   promptId?: string | null;
 }
+
+type VersionFilter = 'all' | 'autosaved' | 'custom';
 
 export function VersionControl({ projectId, promptId }: VersionControlProps) {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -39,6 +44,8 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [manualVersionName, setManualVersionName] = useState('');
   const [manualVersionComment, setManualVersionComment] = useState('');
+  const [versionFilter, setVersionFilter] = useState<VersionFilter>('all');
+  const [openRuns, setOpenRuns] = useState<{ [versionId: string]: boolean }>({});
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -66,15 +73,24 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
       setError(null);
       try {
         const res = await promptsApi.get(projectId, selectedPromptId);
-        const versions = (res.data.versions || []).map((v: any) => ({
-          id: v.id,
-          version: v.version_number,
-          content: v.prompt_text,
-          createdAt: v.created_at,
-          isActive: v.isActive || false,
-          name: v.name || '',
-          comment: v.comment || '',
-        }));
+        const versions = (res.data.versions || []).map((v: any) => {
+          let comments: { name?: string; comment?: string } = {};
+          if (v.comments && typeof v.comments === 'object') {
+            comments = v.comments;
+          } else if (typeof v.comments === 'string') {
+            try { comments = JSON.parse(v.comments); } catch {}
+          }
+          const runs = v.runs || [];
+          return {
+            id: v.id,
+            version: v.version_number,
+            content: v.prompt_text,
+            createdAt: v.created_at,
+            isActive: v.isActive || false,
+            comments,
+            runs,
+          };
+        });
         setPromptVersions(versions);
       } catch (e) {
         setError('Failed to load prompt versions.');
@@ -143,6 +159,14 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
     }
   };
 
+  const filteredVersions = promptVersions.filter((version) => {
+    if (versionFilter === 'all') return true;
+    const name = version.comments?.name;
+    if (versionFilter === 'custom') return !!name;
+    if (versionFilter === 'autosaved') return !name;
+    return true;
+  });
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -162,6 +186,20 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
             Save as Version
           </Button>
         </div>
+      </div>
+
+      <div className="mb-4 flex items-center space-x-4">
+        <span className="font-medium">Show:</span>
+        <Select value={versionFilter} onValueChange={val => setVersionFilter(val as VersionFilter)}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Versions</SelectItem>
+            <SelectItem value="autosaved">Autosaved Only</SelectItem>
+            <SelectItem value="custom">Custom Only</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -195,7 +233,7 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
 
             <TabsContent value="timeline" className="space-y-4">
               <div className="space-y-4">
-                {[...promptVersions].reverse().map((version, index) => (
+                {[...filteredVersions].reverse().map((version, index) => (
                   <Card key={version.id} className={version.isActive ? 'ring-2 ring-primary' : ''}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -205,6 +243,9 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                               v{version.version}
                             </Badge>
                             {version.isActive && <Badge variant="outline">Active</Badge>}
+                            {version.comments?.name && (
+                              <Badge variant="outline" className="ml-2"><User className="w-3 h-3 mr-1 inline" />{version.comments.name}</Badge>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -237,6 +278,50 @@ export function VersionControl({ projectId, promptId }: VersionControlProps) {
                         <div className="bg-muted p-3 rounded text-sm">
                           {version.content}
                         </div>
+                        {version.comments?.comment && (
+                          <div className="text-xs text-muted-foreground mt-2">Comment: {version.comments.comment}</div>
+                        )}
+                        {version.runs && version.runs.length > 0 && (
+                          <div className="mt-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex items-center"
+                              onClick={() => setOpenRuns(prev => ({ ...prev, [version.id]: !prev[version.id] }))}
+                            >
+                              {openRuns[version.id] ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+                              {openRuns[version.id] ? 'Hide Runs' : `Show Runs (${version.runs.length})`}
+                            </Button>
+                            {openRuns[version.id] && (
+                              <div className="mt-2 border rounded bg-background p-2 space-y-2">
+                                {version.runs.map(run => (
+                                  <div key={run.id} className="border-b last:border-b-0 pb-2 mb-2 last:pb-0 last:mb-0">
+                                    <div className="flex flex-wrap items-center justify-between text-xs text-muted-foreground gap-2">
+                                      <span><b>ID:</b> {run.id}</span>
+                                      <span><b>Model:</b> {run.model}</span>
+                                      {typeof run.cost === 'number' && run.cost !== null && <span><b>Cost:</b> {run.cost}</span>}
+                                      <span><b>Started:</b> {run.started_at ? (typeof run.started_at === 'string' ? new Date(run.started_at).toLocaleString() : run.started_at.toLocaleString()) : ''}</span>
+                                      {run.finish_time && run.started_at && (
+                                        <span><b>Duration:</b> {(() => {
+                                          const start = new Date(run.started_at).getTime();
+                                          const end = new Date(run.finish_time).getTime();
+                                          const ms = end - start;
+                                          if (ms > 0) {
+                                            const sec = Math.floor(ms / 1000);
+                                            const min = Math.floor(sec / 60);
+                                            const s = sec % 60;
+                                            return min > 0 ? `${min}m ${s}s` : `${s}s`;
+                                          }
+                                          return '-';
+                                        })()}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

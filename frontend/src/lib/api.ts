@@ -27,7 +27,7 @@ api.interceptors.response.use(
       // Only redirect if we're not already on the login or signup page
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login') && !currentPath.includes('/signup')) {
-        window.location.href = '/login';
+        window.location.href = '/signup';
       }
     }
     return Promise.reject(error);

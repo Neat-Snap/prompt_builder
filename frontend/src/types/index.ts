@@ -25,6 +25,14 @@ export interface ApiKey {
   projectId?: string; // null for account-level keys
 }
 
+export interface Run {
+  id: string;
+  model: string;
+  response: string;
+  createdAt: string | Date;
+  [key: string]: any;
+}
+
 export interface Prompt {
   id: string;
   name: string;
@@ -47,6 +55,8 @@ export interface PromptVersion {
   customFields?: { key: string; value: string }[];
   createdAt: Date;
   isActive: boolean;
+  comments?: { name?: string; comment?: string };
+  runs?: Run[];
 }
 
 export interface TestResult {
