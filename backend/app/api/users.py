@@ -56,6 +56,26 @@ async def get_me_endpoint(request: Request):
     return user
 
 
+@router.post("/me/email")
+async def update_email_endpoint(request: Request):
+    email = request.state.email
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    response = await request.json()
+    new_email = response["new_email"]
+    if not get_user_by_email(new_email):
+        user["email"] = new_email
+        user["verified"] = False
+        set_user(user)
+
+        token = generate_jwt_token(new_email)
+
+        return {"message": "Email updated successfully", "success": True, "token": token}
+    else:
+        raise HTTPException(status_code=400, detail="Email already in use")
+
+
 @router.get("/projects")
 async def get_projects_endpoint(request: Request):
     email = request.state.email

@@ -5,8 +5,11 @@ import jwt
 from jwt import PyJWTError
 from app.settings import settings
 from app.db.functions import get_user_by_email
+import loguru
 
 allowed_paths = ["/health", "/auth/signup", "/auth/login"]
+
+logger = loguru.logger
 
 def check_url(url):
     for path in allowed_paths:
@@ -36,12 +39,15 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             )
 
             if not get_user_by_email(payload["sub"]):
+                logger.debug(f"Invalid or expired token: {request.url.path}")
                 return JSONResponse(status_code=401, content={"detail": "Invalid or expired token"})
             
-            if not get_user_by_email(payload["sub"])["is_verified"]:
+            if not get_user_by_email(payload["sub"])["is_verified"] and not request.url.path.startswith("/auth/send_email") and not request.url.path.startswith("/auth/verify_code"):
+                logger.debug(f"Email not verified: {request.url.path}")
                 return JSONResponse(status_code=401, content={"detail": "Email not verified"})
 
             request.state.email = payload["sub"]
         except PyJWTError:
+            logger.debug(f"Invalid or expired token: {request.url.path}")
             return JSONResponse(status_code=401, content={"detail": "Invalid or expired token"})
         return await call_next(request)

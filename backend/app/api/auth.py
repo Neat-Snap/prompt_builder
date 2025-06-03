@@ -180,13 +180,20 @@ async def verify_code_endpoint(request: Request):
     data = await request.json()
     email = request.state.email
     code = data["code"]
+    old_email = None
+    if "new_email" in data:
+        old_email = email
+        email = data["new_email"]
     logger.debug(f"Received code: {code}")
     logger.debug(f"Codes: {codes}")
-    if codes.get(email) != int(code):
+    if int(codes.get(email)) != int(code):
         raise HTTPException(status_code=400, detail="Invalid code")
     del codes[email]
 
-    user = get_user_by_email(email)
+    if old_email:
+        user = get_user_by_email(old_email)
+    else:
+        user = get_user_by_email(email)
     user["is_verified"] = True
     set_user(user)
 

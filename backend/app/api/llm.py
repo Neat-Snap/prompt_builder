@@ -5,16 +5,12 @@ from app.settings import settings
 import loguru
 from app.utils.openrouter import *
 
-
-
 router = APIRouter(
     prefix="/llm",
     tags=["llm"]
 )
 
 logger = loguru.logger
-
-
 
 
 @router.get("/search")

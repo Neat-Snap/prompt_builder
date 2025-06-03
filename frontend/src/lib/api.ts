@@ -42,8 +42,10 @@ export const authApi = {
   me: () => api.get('users/me'),
   sendVerificationEmail: (email: string) =>
     api.post('/auth/send_email', { email }),
-  verifyEmailCode: (code: string) =>
-    api.post('/auth/verify_code', { code }),
+  verifyEmailCode: (code: string, email?: string) =>
+    api.post('/auth/verify_code', email ? { code, new_email: email } : { code }),
+  changeEmail: (new_email: string) =>
+    api.post('/users/me/email', { new_email }),
 };
 
 export const projectsApi = {

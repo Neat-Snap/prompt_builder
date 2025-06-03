@@ -104,7 +104,7 @@ class Run(Base):
     prompt_version_id = Column(BigInteger, ForeignKey("prompt_versions.id"))
     prompt_version = relationship("PromptVersion", back_populates="runs")
 
-    email = Column(String, ForeignKey("users.email"), nullable=True)
+    email = Column(String, ForeignKey("users.email", onupdate="CASCADE"), nullable=True)
     user = relationship("User")
 
     started_at = Column(DateTime, default=func.now())

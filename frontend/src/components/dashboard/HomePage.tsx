@@ -19,7 +19,8 @@ import { Project } from '@/types';
 import { NewProjectDialog } from '@/components/project/NewProjectDialog';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import api from '@/lib/api';
+import api, { authApi } from '@/lib/api';
+import { Label } from '@/components/ui/label';
 
 export function HomePage() {
   const { user, projects, openProject } = useAppStore();
@@ -28,6 +29,13 @@ export function HomePage() {
   const [openrouterKey, setOpenrouterKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string|null>(null);
+  const [changeEmailDialogOpen, setChangeEmailDialogOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailStep, setEmailStep] = useState<'input' | 'sending' | 'sent' | 'verifying' | 'success'>('input');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (settingsOpen) {
@@ -47,6 +55,45 @@ export function HomePage() {
       setSaveMsg('Failed to save key.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendEmailVerification = async () => {
+    setEmailLoading(true);
+    setEmailError(null);
+    try {
+      await authApi.sendVerificationEmail(newEmail);
+      setEmailStep('sent');
+    } catch (err: any) {
+      setEmailError(err.response?.data?.detail || 'Failed to send verification email.');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleVerifyEmailCode = async () => {
+    setEmailLoading(true);
+    setEmailError(null);
+    try {
+      await authApi.verifyEmailCode(emailCode, newEmail);
+      const res = await authApi.changeEmail(newEmail);
+      if (res.data && res.data.token) {
+        localStorage.setItem('token', res.data.token);
+      }
+      setEmailStep('success');
+      setEmailSuccessMsg('Email updated successfully!');
+      setTimeout(() => {
+        setChangeEmailDialogOpen(false);
+        setEmailStep('input');
+        setNewEmail('');
+        setEmailCode('');
+        setEmailSuccessMsg(null);
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      setEmailError(err.response?.data?.detail || 'Invalid code or failed to update email.');
+    } finally {
+      setEmailLoading(false);
     }
   };
 
@@ -92,6 +139,83 @@ export function HomePage() {
                     {saving ? 'Saving...' : 'Save Key'}
                   </Button>
                   {saveMsg && <div className="text-sm mt-2">{saveMsg}</div>}
+
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium mb-1">Account Email</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{user?.email}</span>
+                      <Button variant="outline" size="sm" onClick={() => setChangeEmailDialogOpen(true)}>
+                        Change Email
+                      </Button>
+                    </div>
+                  </div>
+                  <Dialog open={changeEmailDialogOpen} onOpenChange={setChangeEmailDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Change Account Email</DialogTitle>
+                        <DialogDescription>Enter your new email address and verify it to update your account.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        {emailStep === 'input' && (
+                          <div className="space-y-2">
+                            <Label htmlFor="new-email">New Email</Label>
+                            <Input
+                              id="new-email"
+                              type="email"
+                              value={newEmail}
+                              onChange={e => setNewEmail(e.target.value)}
+                              placeholder="Enter new email"
+                              disabled={emailLoading}
+                            />
+                            <Button
+                              onClick={handleSendEmailVerification}
+                              disabled={!newEmail || emailLoading}
+                              className="w-full mt-2"
+                            >
+                              {emailLoading ? 'Sending...' : 'Send Verification Code'}
+                            </Button>
+                          </div>
+                        )}
+                        {emailStep === 'sent' && (
+                          <div className="space-y-2">
+                            <Label htmlFor="email-code">Verification Code</Label>
+                            <Input
+                              id="email-code"
+                              type="text"
+                              value={emailCode}
+                              onChange={e => setEmailCode(e.target.value)}
+                              placeholder="Enter code from email"
+                              disabled={emailLoading}
+                            />
+                            <Button
+                              onClick={handleVerifyEmailCode}
+                              disabled={!emailCode || emailLoading}
+                              className="w-full mt-2"
+                            >
+                              {emailLoading ? 'Verifying...' : 'Verify & Update Email'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={handleSendEmailVerification}
+                              disabled={emailLoading}
+                              className="w-full mt-2"
+                            >
+                              Resend Code
+                            </Button>
+                          </div>
+                        )}
+                        {emailStep === 'success' && (
+                          <div className="text-green-600 text-center font-medium">{emailSuccessMsg}</div>
+                        )}
+                        {emailError && <div className="text-red-500 text-sm mt-2 text-center">{emailError}</div>}
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline">Close</Button>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
