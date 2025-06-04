@@ -337,7 +337,8 @@ export function PromptPlayground({ projectId, promptId }: PromptPlaygroundProps)
               <Button 
                 onClick={runPlayground} 
                 disabled={!prompt || !userPrompt || isRunning || !selectedModel}
-                className="w-full"
+                className="w-full h-9"
+                size="sm"
               >
                 {isRunning ? (
                   <>

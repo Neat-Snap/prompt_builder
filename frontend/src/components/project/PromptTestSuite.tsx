@@ -466,7 +466,8 @@ export function PromptTestSuite({ projectId, promptId }: PromptTestSuiteProps) {
               <Button
                 onClick={runSuite}
                 disabled={testCases.length === 0 || isRunning || !selectedModelObj || (selectedPromptId === 'custom' && !customPrompt) || (selectedPromptId !== 'custom' && !prompt)}
-                className="w-full"
+                className="w-full h-9"
+                size="sm"
               >
                 {isRunning || polling ? (
                   <>

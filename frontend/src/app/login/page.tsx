@@ -70,10 +70,11 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            className="w-full"
+            className="w-full h-9"
             disabled={loading}
+            size="sm"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? 'Logging in...' : 'Login'}
           </Button>
 
           <div className="text-center text-sm">

@@ -77,7 +77,7 @@ export function SaveCustomVersionDialog({ open, onOpenChange, onSave, loading }:
           {error && <div className="text-red-500 text-sm">{error}</div>}
         </div>
         <DialogFooter>
-          <Button onClick={handleSave} disabled={loading || !name.trim()}>
+          <Button onClick={handleSave} disabled={loading || !name.trim()} size="sm" className="h-9">
             {loading ? 'Saving...' : 'Save Version'}
           </Button>
         </DialogFooter>

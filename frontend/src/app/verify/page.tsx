@@ -60,7 +60,7 @@ export default function VerifyPage() {
           To continue, please verify your email address: <b>{email}</b>
         </p>
         {step === "start" && (
-          <Button onClick={handleSendEmail} disabled={loading} className="w-full">
+          <Button onClick={handleSendEmail} disabled={loading} className="w-full h-9" size="sm">
             {loading ? "Sending..." : "Send verification email"}
           </Button>
         )}
@@ -75,11 +75,11 @@ export default function VerifyPage() {
                 disabled={loading}
               />
             </div>
-            <Button onClick={handleVerify} disabled={loading || !code} className="w-full">
+            <Button onClick={handleVerify} disabled={loading || !code} className="w-full h-9" size="sm">
               {loading ? "Verifying..." : "Verify"}
             </Button>
             <div className="mt-2">
-              <Button variant="outline" onClick={handleSendEmail} disabled={loading} className="w-full">
+              <Button onClick={handleSendEmail} disabled={loading} className="w-full h-9" size="sm">
                 Resend email
               </Button>
             </div>

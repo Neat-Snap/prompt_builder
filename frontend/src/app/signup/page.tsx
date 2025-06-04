@@ -84,10 +84,11 @@ export default function SignupPage() {
 
           <Button
             type="submit"
-            className="w-full"
+            className="w-full h-9"
             disabled={loading}
+            size="sm"
           >
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? 'Signing up...' : 'Sign Up'}
           </Button>
 
           <div className="text-center text-sm">

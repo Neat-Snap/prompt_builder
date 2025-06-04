@@ -97,13 +97,14 @@ export function NewProjectDialog({ open, onOpenChange }: NewProjectDialogProps) 
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              size="sm"
+              className="h-9"
               onClick={() => onOpenChange(false)}
               disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" size="sm" className="h-9" disabled={loading}>
               {loading ? 'Creating...' : 'Create Project'}
             </Button>
           </DialogFooter>
