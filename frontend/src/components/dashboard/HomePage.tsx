@@ -36,6 +36,11 @@ export function HomePage() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState(false);
+  const [inputSaved, setInputSaved] = useState(false);
+
+  // Helper to determine if a key is saved
+  const keyIsSaved = !!openrouterKey;
 
   useEffect(() => {
     if (settingsOpen) {
@@ -47,10 +52,10 @@ export function HomePage() {
 
   const handleSaveKey = async () => {
     setSaving(true);
-    setSaveMsg(null);
     try {
       await api.post('/llm/openrouter_key', { openrouter_key: openrouterKey });
-      setSaveMsg('Key saved!');
+      setInputSaved(true);
+      setTimeout(() => setInputSaved(false), 1500);
     } catch (e) {
       setSaveMsg('Failed to save key.');
     } finally {
@@ -101,6 +106,13 @@ export function HomePage() {
     openProject(project.id);
   };
 
+  // Helper to mask the API key
+  const maskKey = (key: string) => {
+    if (!key) return '';
+    if (key.length <= 8) return '****';
+    return key.slice(0, 3) + '****' + key.slice(-4);
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -124,27 +136,60 @@ export function HomePage() {
                   <DialogTitle>Settings</DialogTitle>
                   <DialogDescription>Manage your account and API keys.</DialogDescription>
                 </DialogHeader>
-                <div className="py-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">OpenRouter API Key</label>
-                    <Input
-                      type="text"
-                      value={openrouterKey}
-                      onChange={e => setOpenrouterKey(e.target.value)}
-                      placeholder="sk-..."
-                      disabled={saving}
-                    />
-                  </div>
-                  <Button onClick={handleSaveKey} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Key'}
-                  </Button>
-                  {saveMsg && <div className="text-sm mt-2">{saveMsg}</div>}
-
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium mb-1">Account Email</label>
+                <div className="py-4 space-y-8">
+                  {/* API Key Section */}
+                  <div className="space-y-2">
+                    <Label className="block" htmlFor="openrouter-key">OpenRouter API Key</Label>
                     <div className="flex items-center gap-2">
-                      <span className="text-base">{user?.email}</span>
-                      <Button variant="outline" size="sm" onClick={() => setChangeEmailDialogOpen(true)}>
+                      <Input
+                        id="openrouter-key"
+                        type="password"
+                        value={openrouterKey}
+                        onChange={e => setOpenrouterKey(e.target.value)}
+                        placeholder="sk-..."
+                        disabled={saving || (!editingKey && keyIsSaved)}
+                        className={`w-full transition-colors duration-300 ${inputSaved ? 'border-green-700 bg-green-200' : ''}`}
+                      />
+                      {(!keyIsSaved || editingKey) ? (
+                        <Button
+                          size="sm"
+                          className="h-9"
+                          onClick={async () => {
+                            if (editingKey) {
+                              await handleSaveKey();
+                              setEditingKey(false);
+                            } else {
+                              setEditingKey(true);
+                            }
+                          }}
+                          disabled={saving || !openrouterKey}
+                        >
+                          Save
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-9"
+                          onClick={() => setEditingKey(true)}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Account Section */}
+                  <div className="space-y-2">
+                    <Label className="block" htmlFor="account-email">Account Email</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="account-email"
+                        type="text"
+                        value={user?.email || ''}
+                        readOnly
+                        className="w-full cursor-default bg-muted"
+                        tabIndex={-1}
+                      />
+                      <Button size="sm" className="h-9" onClick={() => setChangeEmailDialogOpen(true)}>
                         Change Email
                       </Button>
                     </div>
@@ -168,6 +213,7 @@ export function HomePage() {
                               disabled={emailLoading}
                             />
                             <Button
+                              size="sm"
                               onClick={handleSendEmailVerification}
                               disabled={!newEmail || emailLoading}
                               className="w-full mt-2"
@@ -188,6 +234,7 @@ export function HomePage() {
                               disabled={emailLoading}
                             />
                             <Button
+                              size="sm"
                               onClick={handleVerifyEmailCode}
                               disabled={!emailCode || emailLoading}
                               className="w-full mt-2"
@@ -195,7 +242,7 @@ export function HomePage() {
                               {emailLoading ? 'Verifying...' : 'Verify & Update Email'}
                             </Button>
                             <Button
-                              variant="outline"
+                              size="sm"
                               onClick={handleSendEmailVerification}
                               disabled={emailLoading}
                               className="w-full mt-2"
@@ -211,17 +258,17 @@ export function HomePage() {
                       </div>
                       <DialogFooter>
                         <DialogClose asChild>
-                          <Button variant="outline">Close</Button>
+                          <Button size="sm">Close</Button>
                         </DialogClose>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </div>
-                <DialogFooter>
+                {/* <DialogFooter>
                   <DialogClose asChild>
-                    <Button variant="outline">Close</Button>
+                    <Button size="sm">Close</Button>
                   </DialogClose>
-                </DialogFooter>
+                </DialogFooter> */}
               </DialogContent>
             </Dialog>
             <Avatar>
