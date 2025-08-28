@@ -13,3 +13,9 @@
 *agents*
 
 !.env.example
+
+/tests
+/go_backend
+
+.DS_Store
+.idea
